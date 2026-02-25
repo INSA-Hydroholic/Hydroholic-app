@@ -5,8 +5,15 @@
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+// Palette de couleurs Hydroholic
+const primary = '#1c5588'; // Bleu oscuro
+const secondary = '#00bdc8'; // Cyan
+const accent = '#7acfb0'; // Verde menta
+const light = '#fbce9e'; // Naranja claro
+const dark = '#f88f52'; // Naranja oscuro
+
+const tintColorLight = primary;
+const tintColorDark = secondary;
 
 export const Colors = {
   light: {
@@ -16,6 +23,16 @@ export const Colors = {
     icon: '#687076',
     tabIconDefault: '#687076',
     tabIconSelected: tintColorLight,
+    primary: primary,
+    secondary: secondary,
+    accent: accent,
+    light: light,
+    dark: dark,
+    success: accent,
+    warning: dark,
+    info: secondary,
+    lightGray: '#f5f5f5',
+    border: '#e0e0e0',
   },
   dark: {
     text: '#ECEDEE',
@@ -24,7 +41,26 @@ export const Colors = {
     icon: '#9BA1A6',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
+    primary: primary,
+    secondary: secondary,
+    accent: accent,
+    light: light,
+    dark: dark,
+    success: accent,
+    warning: dark,
+    info: secondary,
+    lightGray: '#2a2a2a',
+    border: '#333333',
   },
+};
+
+// Export palette for easy access
+export const Palette = {
+  primary,
+  secondary,
+  accent,
+  light,
+  dark,
 };
 
 export const Fonts = Platform.select({
