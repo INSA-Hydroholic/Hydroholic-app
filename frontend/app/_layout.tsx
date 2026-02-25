@@ -7,17 +7,14 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { UserProvider } from '@/context/UserContext';
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
   const { isLoggedIn } = useAuth();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
+    <ThemeProvider value={DefaultTheme}>
+      <Stack screenOptions={{ headerShown: false }}>
         {!isLoggedIn ? (
           <>
             <Stack.Screen name="login" options={{ headerShown: false }} />

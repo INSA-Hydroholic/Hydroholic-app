@@ -7,7 +7,6 @@ interface HeaderProps {
   onMenuPress?: () => void;
   onNotificationsPress?: () => void;
   onProfilePress?: () => void;
-  onSearchPress?: () => void;
   notificationCount?: number;
 }
 
@@ -15,7 +14,6 @@ export const Header: React.FC<HeaderProps> = ({
   onMenuPress,
   onNotificationsPress,
   onProfilePress,
-  onSearchPress,
   notificationCount = 0,
 }) => {
   const colorScheme = useColorScheme();
@@ -30,15 +28,11 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Center: Logo */}
       <View style={styles.centerContainer}>
-        <Text style={[styles.logo, { color: Palette.primary }]}>💧 Hydroholic</Text>
+        <Text style={[styles.logo, { color: Palette.primary }]}> Hydroholic</Text>
       </View>
 
       {/* Right: Icons */}
       <View style={styles.rightContainer}>
-        {/* Search */}
-        <Pressable style={styles.iconButton} onPress={onSearchPress}>
-          <Text style={[styles.icon, { color: colors.text }]}>🔍</Text>
-        </Pressable>
 
         {/* Notifications */}
         <Pressable style={styles.iconButton} onPress={onNotificationsPress}>
