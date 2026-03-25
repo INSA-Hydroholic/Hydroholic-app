@@ -16,7 +16,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<any>(null);
 
   const login = async (username: string, password: string) => {
-    // TODO: Faire un appel API réel
+    //TODO: Faire un appel API réel
     setIsLoggedIn(true);
     setUser({ username, email: 'user@example.com' });
   };
