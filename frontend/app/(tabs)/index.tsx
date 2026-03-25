@@ -57,7 +57,6 @@ export default function HomeScreen() {
         onMenuPress={() => setMenuVisible(true)}
         onNotificationsPress={() => console.log('Notifications')}
         onProfilePress={() => console.log('Profile')}
-        onSearchPress={() => console.log('Search')}
         notificationCount={3}
       />
 

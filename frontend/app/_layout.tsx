@@ -7,9 +7,6 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { UserProvider } from '@/context/UserContext';
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();

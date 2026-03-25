@@ -114,7 +114,6 @@ export default function FriendsScreen() {
         onMenuPress={() => setMenuVisible(true)}
         onNotificationsPress={() => console.log('Notifications')}
         onProfilePress={() => console.log('Profile')}
-        onSearchPress={() => setSelectedTab('search')}
       />
 
       <SideMenu
