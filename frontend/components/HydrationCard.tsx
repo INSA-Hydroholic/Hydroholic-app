@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
 import { Colors, Palette } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -20,7 +20,13 @@ export const HydrationCard: React.FC<HydrationCardProps> = ({ current, goal, onA
       <Text style={[styles.title, { color: colors.text }]}>Ton hydratation aujourd'hui</Text>
 
       <View style={styles.progressContainer}>
-        {/* Grand cercle de progression */}
+        {/* Logo de la gota - Lado izquierdo */}
+        <Image
+          source={require('../assets/images/hydroholic/logo.png')}
+          style={styles.waterDropLogo}
+        />
+        
+        {/* Círculo de progresión - Lado derecho */}
         <View
           style={[
             styles.progressCircle,
@@ -82,13 +88,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   progressContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 20,
+    justifyContent: 'space-around',
+    marginVertical: 10,
+    gap: 10,
+  },
+  waterDropLogo: {
+    width: 150,
+    height: 150,
+    resizeMode: 'contain',
   },
   progressCircle: {
-    width: 180,
-    height: 180,
-    borderRadius: 90,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
     borderWidth: 8,
     alignItems: 'center',
     justifyContent: 'center',
