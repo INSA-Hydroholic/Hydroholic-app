@@ -12,7 +12,7 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false); // Par défaut à true pour les tests sur le menu, false pour test login/logout
   const [user, setUser] = useState<any>(null);
 
   const login = async (username: string, password: string) => {
@@ -25,6 +25,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // TODO: Faire un appel API réel
     setIsLoggedIn(true);
     setUser(userData);
+    console.log("Fini !");
   };
 
   const logout = () => {

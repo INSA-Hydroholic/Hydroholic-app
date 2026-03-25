@@ -13,22 +13,24 @@ function RootLayoutNav() {
   const { isLoggedIn } = useAuth();
 
   return (
-    <ThemeProvider value={DefaultTheme}>
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack screenOptions={{ headerShown: false }}>
-        {!isLoggedIn ? (
-          <>
-            <Stack.Screen name="login" options={{ headerShown: false }} />
-            <Stack.Screen name="register" options={{ headerShown: false }} />
-            <Stack.Screen name="recommendations" options={{ headerShown: false }} />
-          </>
-        ) : (
-          <>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-          </>
-        )}
+        
+        <Stack.Screen 
+          name="login" 
+          redirect={isLoggedIn} // Si connecté, ne pas autoriser le login
+        />
+        <Stack.Screen name="register" 
+          redirect={isLoggedIn} />
+        <Stack.Screen name="recommendations"
+          redirect={isLoggedIn}  />
+
+        <Stack.Screen 
+          name="(tabs)" 
+          redirect={!isLoggedIn} // Si déconnecté, ne pas autoriser les tabs
+        />
+       
       </Stack>
-      <StatusBar style="auto" />
     </ThemeProvider>
   );
 }
