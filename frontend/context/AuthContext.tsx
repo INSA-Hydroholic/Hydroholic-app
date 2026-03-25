@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
+import { authApi } from '@/services/api';
 
 type AuthContextType = {
   isLoggedIn: boolean;
@@ -16,16 +17,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<any>(null);
 
   const login = async (username: string, password: string) => {
-    // TODO: Faire un appel API réel
+    const data = await authApi.login(username, password);
     setIsLoggedIn(true);
-    setUser({ username, email: 'user@example.com' });
+    setUser(data.user);
   };
 
   const register = async (userData: any) => {
-    // TODO: Faire un appel API réel
+    const data = await authApi.register(userData);
     setIsLoggedIn(true);
-    setUser(userData);
-    console.log("Fini !");
+    setUser(data.user);
   };
 
   const logout = () => {

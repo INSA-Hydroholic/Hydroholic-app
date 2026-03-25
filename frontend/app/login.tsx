@@ -12,17 +12,20 @@ import { Colors, Palette } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { InputField } from '@/components/InputField';
 import { Button } from '@/components/Button';
+import { useAuth } from '@/context/AuthContext';
 
 export default function LoginScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
+  const { login } = useAuth();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     const newErrors: { [key: string]: string } = {};
 
     if (!username) newErrors.username = 'Le nom d\'utilisateur est requis';
@@ -33,8 +36,15 @@ export default function LoginScreen() {
       return;
     }
 
-    // TODO: Faire un appel API réel
-    router.push('/(tabs)' as any);
+    setIsLoading(true);
+    try {
+      await login(username, password);
+      // Navigation automatique gérée par AuthContext
+    } catch (error: any) {
+      setErrors({ general: error.message || 'Erreur de connexion' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -52,13 +62,19 @@ export default function LoginScreen() {
         <View style={styles.formContainer}>
           <Text style={[styles.title, { color: colors.text }]}>Connexion</Text>
 
+          {errors.general && (
+            <Text style={[styles.errorText, { color: 'red' }]}>
+              {errors.general}
+            </Text>
+          )}
+
           <InputField
             label="Nom d'utilisateur ou email"
             placeholder="Entrez votre nom d'utilisateur ou email"
             value={username}
             onChangeText={(text) => {
               setUsername(text);
-              setErrors({ ...errors, username: '' });
+              setErrors({ ...errors, username: '', general: '' });
             }}
             error={errors.username}
           />
@@ -69,7 +85,7 @@ export default function LoginScreen() {
             value={password}
             onChangeText={(text) => {
               setPassword(text);
-              setErrors({ ...errors, password: '' });
+              setErrors({ ...errors, password: '', general: '' });
             }}
             type="password"
             error={errors.password}
@@ -82,10 +98,11 @@ export default function LoginScreen() {
           </Pressable>
 
           <Button
-            title="Se connecter"
+            title={isLoading ? "Connexion..." : "Se connecter"}
             onPress={handleLogin}
             size="large"
             style={styles.button}
+            disabled={isLoading}
           />
         </View>
 
@@ -136,6 +153,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 24,
     textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 14,
+    marginBottom: 16,
+    textAlign: 'center',
+    fontWeight: '500',
   },
   forgotPassword: {
     fontSize: 12,
