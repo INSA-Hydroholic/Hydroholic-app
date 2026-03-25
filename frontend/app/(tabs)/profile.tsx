@@ -251,8 +251,6 @@ export default function ProfileScreen() {
         <Button
           title="Se déconnecter"
           onPress={() => {
-            console.log("CLIC DÉTECTÉ"); // Pour ton terminal
-            Alert.alert("Test", "Le clic fonctionne !"); // Pour ton téléphone
             logout();
           }}
           variant="danger"

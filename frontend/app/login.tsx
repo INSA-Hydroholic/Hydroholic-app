@@ -12,17 +12,19 @@ import { Colors, Palette } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { InputField } from '@/components/InputField';
 import { Button } from '@/components/Button';
+import { useAuth } from '@/context/AuthContext';
 
 export default function LoginScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
+  const { login } = useAuth();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     const newErrors: { [key: string]: string } = {};
 
     if (!username) newErrors.username = 'Le nom d\'utilisateur est requis';
@@ -33,8 +35,11 @@ export default function LoginScreen() {
       return;
     }
 
-    // TODO: Faire un appel API réel
-    router.push('/(tabs)' as any);
+    try {
+      await login(username, password); 
+    } catch (error) {
+      console.error("Erreur lors de la connexion", error);
+    }
   };
 
   return (
