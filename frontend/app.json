@@ -12,8 +12,10 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "Hydroholic utilise le Bluetooth pour se connecter à ta gourde.",
-        "NSBluetoothPeripheralUsageDescription": "Hydroholic utilise le Bluetooth pour se connecter à ta gourde."
-      }
+        "NSBluetoothPeripheralUsageDescription": "Hydroholic utilise le Bluetooth pour se connecter à ta gourde.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.josuevega7.frontend"
     },
     "android": {
       "adaptiveIcon": {
@@ -52,6 +54,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "67407e82-9b02-4e28-803a-14ae1809b2ed"
+      }
     }
   }
 }
