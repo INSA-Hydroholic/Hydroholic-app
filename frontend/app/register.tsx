@@ -12,8 +12,10 @@ import { Colors, Palette } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { InputField } from '@/components/InputField';
 import { Button } from '@/components/Button';
+import { useAuth } from '@/context/AuthContext';
 
 export default function RegisterScreen() {
+  const { register } = useAuth();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
@@ -29,7 +31,7 @@ export default function RegisterScreen() {
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-  const handleRegister = () => {
+  const handleRegister = async() => {
     const newErrors: { [key: string]: string } = {};
 
     if (!formData.nom) newErrors.nom = 'Le nom est requis';
@@ -45,6 +47,8 @@ export default function RegisterScreen() {
       setErrors(newErrors);
       return;
     }
+
+    await register(formData);
 
     // TODO: Faire un appel API réel
   };

@@ -17,21 +17,23 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        {!isLoggedIn ? (
-          <>
-            <Stack.Screen name="login" options={{ headerShown: false }} />
-            <Stack.Screen name="register" options={{ headerShown: false }} />
-            <Stack.Screen name="recommendations" options={{ headerShown: false }} />
-          </>
-        ) : (
-          <>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-          </>
-        )}
+      <Stack screenOptions={{ headerShown: false }}>
+        
+        <Stack.Screen 
+          name="login" 
+          redirect={isLoggedIn} // Si connecté, ne pas autoriser le login
+        />
+        <Stack.Screen name="register" 
+          redirect={isLoggedIn} />
+        <Stack.Screen name="recommendations"
+          redirect={isLoggedIn}  />
+
+        <Stack.Screen 
+          name="(tabs)" 
+          redirect={!isLoggedIn} // Si déconnecté, ne pas autoriser les tabs
+        />
+       
       </Stack>
-      <StatusBar style="auto" />
     </ThemeProvider>
   );
 }

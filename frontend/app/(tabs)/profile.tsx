@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Alert } from 'react-native';
 import {
   View,
   StyleSheet,
@@ -13,12 +14,14 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Header } from '@/components/Header';
 import { SideMenu } from '@/components/SideMenu';
 import { Button } from '@/components/Button';
+import { useAuth } from '@/context/AuthContext';
 
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const [menuVisible, setMenuVisible] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const { logout } = useAuth();
 
   // Mock user data
   const userProfile = {
@@ -247,7 +250,11 @@ export default function ProfileScreen() {
         {/* Logout */}
         <Button
           title="Se déconnecter"
-          onPress={() => console.log('Logout')}
+          onPress={() => {
+            console.log("CLIC DÉTECTÉ"); // Pour ton terminal
+            Alert.alert("Test", "Le clic fonctionne !"); // Pour ton téléphone
+            logout();
+          }}
           variant="danger"
           size="large"
           style={styles.logoutButton}
