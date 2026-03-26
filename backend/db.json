@@ -20,6 +20,25 @@
       "challengeIds": [],
       "waterCompletedMl": 0,
       "score": 0
+    },
+    {
+      "id": "84ta0MbNnLq3XAlRmwLt8",
+      "username": "josue",
+      "email": "josuevegavalbuena@gmail.com",
+      "passwordHash": "$2b$10$f3WUiMpzx7s1CaHUGdFiMuQhxh4076qu4WmVqhTMxOzpEp9zqipsa",
+      "challengeIds": [],
+      "waterCompletedMl": 0,
+      "score": 0
+    },
+    {
+      "id": "HKa6_9fKVyF6tWFdu7Gi7",
+      "username": "perezcarlos",
+      "email": "perezcarlos@gmail.com",
+      "fullname": "Carlos Perez",
+      "passwordHash": "$2b$10$rCHboUz7EjF50vifayNNBe0ObtgwyZlkDcFeGFAmeM20HIi8GU9Oi",
+      "challengeIds": [],
+      "waterCompletedMl": 0,
+      "score": 0
     }
   ],
   "challenges": [

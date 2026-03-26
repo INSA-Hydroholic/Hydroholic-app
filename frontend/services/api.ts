@@ -1,4 +1,9 @@
 const API_URL = process.env.API_URL || 'http://localhost:4000/api';
+let authToken: string | null = null;
+
+export const setAuthToken = (token: string | null) => {
+  authToken = token;
+};
 
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -11,6 +16,7 @@ const request = async (path: string, options: RequestOptions = {}) => {
     method: options.method || 'GET',
     headers: {
       'Content-Type': 'application/json',
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       ...options.headers
     },
     body: options.body ? JSON.stringify(options.body) : undefined

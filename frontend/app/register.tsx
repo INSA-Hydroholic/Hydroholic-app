@@ -30,6 +30,7 @@ export default function RegisterScreen() {
     confirmPassword: '',
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleRegister = async() => {
     const newErrors: { [key: string]: string } = {};
@@ -48,9 +49,22 @@ export default function RegisterScreen() {
       return;
     }
 
-    await register(formData);
+    setIsLoading(true);
+    try {
+      const payload = {
+        username: formData.username.trim(),
+        email: formData.email.trim(),
+        password: formData.password,
+        fullname: `${formData.prenom.trim()} ${formData.nom.trim()}`.trim(),
+      };
 
-    // TODO: Faire un appel API réel
+      await register(payload);
+      // Navigation automatique gérée par AuthContext
+    } catch (error: any) {
+      setErrors({ general: error.message || 'Erreur lors de la creation du compte' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -68,13 +82,22 @@ export default function RegisterScreen() {
         <View style={styles.formContainer}>
           <Text style={[styles.title, { color: colors.text }]}>Inscription</Text>
 
+          {errors.general && (
+            <Text style={[styles.errorText, { color: 'red' }]}>
+              {errors.general}
+            </Text>
+          )}
+
           <View style={styles.nameRow}>
             <View style={styles.halfInput}>
               <InputField
                 label="Prénom"
                 placeholder="Jean"
                 value={formData.prenom}
-                onChangeText={(text) => setFormData({ ...formData, prenom: text })}
+                onChangeText={(text) => {
+                  setFormData({ ...formData, prenom: text });
+                  setErrors({ ...errors, prenom: '', general: '' });
+                }}
                 error={errors.prenom}
               />
             </View>
@@ -83,7 +106,10 @@ export default function RegisterScreen() {
                 label="Nom"
                 placeholder="Dupont"
                 value={formData.nom}
-                onChangeText={(text) => setFormData({ ...formData, nom: text })}
+                onChangeText={(text) => {
+                  setFormData({ ...formData, nom: text });
+                  setErrors({ ...errors, nom: '', general: '' });
+                }}
                 error={errors.nom}
               />
             </View>
@@ -93,7 +119,10 @@ export default function RegisterScreen() {
             label="Nom d'utilisateur"
             placeholder="jeandupont"
             value={formData.username}
-            onChangeText={(text) => setFormData({ ...formData, username: text })}
+            onChangeText={(text) => {
+              setFormData({ ...formData, username: text });
+              setErrors({ ...errors, username: '', general: '' });
+            }}
             error={errors.username}
           />
 
@@ -101,7 +130,10 @@ export default function RegisterScreen() {
             label="Email"
             placeholder="jean@example.com"
             value={formData.email}
-            onChangeText={(text) => setFormData({ ...formData, email: text })}
+            onChangeText={(text) => {
+              setFormData({ ...formData, email: text });
+              setErrors({ ...errors, email: '', general: '' });
+            }}
             type="email"
             error={errors.email}
           />
@@ -119,7 +151,10 @@ export default function RegisterScreen() {
             label="Mot de passe"
             placeholder="Entrez un mot de passe sécurisé"
             value={formData.password}
-            onChangeText={(text) => setFormData({ ...formData, password: text })}
+            onChangeText={(text) => {
+              setFormData({ ...formData, password: text });
+              setErrors({ ...errors, password: '', general: '' });
+            }}
             type="password"
             error={errors.password}
           />
@@ -128,16 +163,20 @@ export default function RegisterScreen() {
             label="Confirmer le mot de passe"
             placeholder="Confirmez votre mot de passe"
             value={formData.confirmPassword}
-            onChangeText={(text) => setFormData({ ...formData, confirmPassword: text })}
+            onChangeText={(text) => {
+              setFormData({ ...formData, confirmPassword: text });
+              setErrors({ ...errors, confirmPassword: '', general: '' });
+            }}
             type="password"
             error={errors.confirmPassword}
           />
 
           <Button
-            title="S'inscrire"
+            title={isLoading ? "Inscription..." : "S'inscrire"}
             onPress={handleRegister}
             size="large"
             style={styles.button}
+            disabled={isLoading}
           />
         </View>
 
@@ -187,6 +226,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 24,
     textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 14,
+    marginBottom: 16,
+    textAlign: 'center',
+    fontWeight: '500',
   },
   nameRow: {
     flexDirection: 'row',

@@ -1,15 +1,14 @@
-export type User = {
-  id: string;
+export type PublicUser = {
+  id: number;
   username: string;
   email: string;
-  passwordHash: string;
-  fullname?: string;
+  fullname: string;
   challengeIds: string[];
   waterCompletedMl: number;
   score: number;
 };
 
-export type Challenge = {
+export type ApiChallenge = {
   id: string;
   name: string;
   type: 'daily' | 'weekly' | 'monthly' | 'team';
@@ -19,16 +18,7 @@ export type Challenge = {
   progressByUser: Record<string, number>;
   creatorId: string;
   createdAt: string;
-};
-
-export type Recommendation = {
-  id: string;
   title: string;
   description: string;
-};
-
-export type DbSchema = {
-  users: User[];
-  challenges: Challenge[];
-  recommendations: Recommendation[];
+  status: string;
 };

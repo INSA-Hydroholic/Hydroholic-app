@@ -10,7 +10,11 @@ import { UserProvider } from '@/context/UserContext';
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
-  const { isLoggedIn } = useAuth();
+  const { isAuthReady, isLoggedIn } = useAuth();
+
+  if (!isAuthReady) {
+    return null;
+  }
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
