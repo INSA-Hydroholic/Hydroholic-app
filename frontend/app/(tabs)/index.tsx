@@ -26,7 +26,14 @@ export default function HomeScreen() {
   const [menuVisible, setMenuVisible] = useState(false);
   const [hydrationAmount, setHydrationAmount] = useState(1.8);
   const [hydrationGoal] = useState(3.2);
-  const { isConnected, isScanning, weightValue, statusMsg, connectToESP32, disconnect } = useBLE();
+  const {
+    isConnected,
+    isScanning,
+    weightValue,
+    statusMsg,
+    connectToESP32,
+    disconnect,
+  } = useBLE();
 
   // Mock data
   const rankings = [
@@ -84,10 +91,11 @@ export default function HomeScreen() {
           {isScanning
             ? <ActivityIndicator color="#fff" />
             : <Text style={styles.bleButtonText}>
-                {isConnected ? '🔴 Desconectar' : '🔵 Conectar ESP32'}
+                {isConnected ? ' Deconnecter' : ' Connecter ESP32'}
               </Text>
           }
         </TouchableOpacity>
+
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
