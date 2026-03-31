@@ -4,6 +4,9 @@ import {
   StyleSheet,
   ScrollView,
   SafeAreaView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Text,
 } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -14,6 +17,7 @@ import { ObjectiveCard } from '@/components/ObjectiveCard';
 import { ChallengeCard } from '@/components/ChallengeCard';
 import { RankingCard } from '@/components/RankingCard';
 import { HistoryCard } from '@/components/HistoryCard';
+import { useBLE } from '@/hooks/useBLE'; 
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
@@ -22,6 +26,7 @@ export default function HomeScreen() {
   const [menuVisible, setMenuVisible] = useState(false);
   const [hydrationAmount, setHydrationAmount] = useState(1.8);
   const [hydrationGoal] = useState(3.2);
+  const { isConnected, isScanning, weightValue, statusMsg, connectToESP32, disconnect } = useBLE();
 
   // Mock data
   const rankings = [
@@ -65,6 +70,25 @@ export default function HomeScreen() {
         onClose={() => setMenuVisible(false)}
         onItemPress={handleMenuItemPress}
       />
+
+      <View style={styles.bleContainer}>
+        <Text style={styles.bleStatus}>{statusMsg}</Text>
+        {weightValue !== null && (
+          <Text style={styles.bleWeight}>💧 {weightValue.toFixed(2)} L</Text>
+        )}
+        <TouchableOpacity
+          style={[styles.bleButton, isConnected ? styles.bleButtonDisconnect : styles.bleButtonConnect]}
+          onPress={isConnected ? disconnect : connectToESP32}
+          disabled={isScanning}
+        >
+          {isScanning
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.bleButtonText}>
+                {isConnected ? '🔴 Desconectar' : '🔵 Conectar ESP32'}
+              </Text>
+          }
+        </TouchableOpacity>
+      </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Hydration Card */}
@@ -112,4 +136,17 @@ const styles = StyleSheet.create({
   sectionContainer: {
     marginVertical: 12,
   },
+  bleContainer: {
+    paddingHorizontal: 16, paddingVertical: 10,
+    alignItems: 'center', gap: 6,
+  },
+  bleStatus: { fontSize: 13, color: '#666' },
+  bleWeight: { fontSize: 18, fontWeight: 'bold', color: '#2196F3' },
+  bleButton: {
+    paddingVertical: 12, paddingHorizontal: 32,
+    borderRadius: 25, width: '80%', alignItems: 'center',
+  },
+  bleButtonConnect:    { backgroundColor: '#2196F3' },
+  bleButtonDisconnect: { backgroundColor: '#f44336' },
+  bleButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
 });

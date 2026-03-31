@@ -47,16 +47,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     restoreSession();
   }, []);
 
-  const login = async (username: string, password: string) => {
-    const data = await authApi.login(username, password);
-    setAuthToken(data.token);
+  const MOCK_USER = {
+  id: '1',
+  username: 'admin',
+  email: 'admin@hydroholic.com',
+  name: 'Admin',
+};
+
+const login = async (username: string, password: string) => {
+  // 🧪 Mock — elimina esto cuando el backend esté listo
+  if (username === 'admin' && password === 'admin+') {
+    const mockToken = 'mock-token-123';
+    setAuthToken(mockToken);
     await Promise.all([
-      AsyncStorage.setItem(STORAGE_TOKEN_KEY, data.token),
-      AsyncStorage.setItem(STORAGE_USER_KEY, JSON.stringify(data.user))
+      AsyncStorage.setItem(STORAGE_TOKEN_KEY, mockToken),
+      AsyncStorage.setItem(STORAGE_USER_KEY, JSON.stringify(MOCK_USER))
     ]);
     setIsLoggedIn(true);
-    setUser(data.user);
-  };
+    setUser(MOCK_USER);
+    return;
+  }
+  // Llamada real al backend
+  const data = await authApi.login(username, password);
+  setAuthToken(data.token);
+  await Promise.all([
+    AsyncStorage.setItem(STORAGE_TOKEN_KEY, data.token),
+    AsyncStorage.setItem(STORAGE_USER_KEY, JSON.stringify(data.user))
+  ]);
+  setIsLoggedIn(true);
+  setUser(data.user);
+};
 
   const register = async (userData: any) => {
     const data = await authApi.register(userData);
