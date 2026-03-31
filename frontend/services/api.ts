@@ -56,3 +56,9 @@ export const usersApi = {
   getRecommendations: (userId: string) => request(`/users/${userId}/recommendations`),
   ranking: () => request('/users/ranking')
 };
+
+export const hydrationApi = {
+  log: (payload: { amountMl: number; time: number; userId?: string }) =>
+    request('/hydration', { method: 'POST', body: payload }),
+  history: () => request('/hydration')
+};

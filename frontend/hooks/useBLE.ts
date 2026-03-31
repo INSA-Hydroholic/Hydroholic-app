@@ -2,6 +2,8 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { PermissionsAndroid, Platform, Alert } from 'react-native';
 import { BleManager, Device } from 'react-native-ble-plx';
 import { Buffer } from 'buffer';
+import { hydrationApi } from '@/services/api';
+import { useAuth } from '@/context/AuthContext';
 
 const SERVICE_UUID        = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
 const CHARACTERISTIC_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
@@ -10,6 +12,7 @@ const TIME_CHARACTERISTIC_UUID = 'e3223119-9445-4e96-a402-55369581a030';
 
 
 export function useBLE() {
+  const { user } = useAuth();
   const managerRef = useRef<BleManager | null>(null);
   const [isConnected, setIsConnected]   = useState(false);
   const [isScanning, setIsScanning]     = useState(false);
@@ -98,6 +101,67 @@ export function useBLE() {
     }
   }, [encodeToBase64, isConnected]);
 
+  const sendProtocolResponse = useCallback(async (message: 'OK' | 'ERROR') => {
+    if (!deviceRef.current || !isConnected) {
+      return;
+    }
+
+    try {
+      await deviceRef.current.writeCharacteristicWithResponseForService(
+        SERVICE_UUID,
+        CHARACTERISTIC_UUID,
+        encodeToBase64(message)
+      );
+    } catch (e: any) {
+      setStatusMsg('Erreur envoi reponse protocole: ' + e.message);
+    }
+  }, [encodeToBase64, isConnected]);
+
+  const processHydrationPacket = useCallback(async (rawValue: string) => {
+    let parsedJson: any;
+    try {
+      parsedJson = JSON.parse(rawValue);
+    } catch {
+      return false;
+    }
+
+    if (!parsedJson || typeof parsedJson !== 'object') {
+      return false;
+    }
+
+    const amountCandidate =
+      parsedJson.amountMl ??
+      parsedJson.ml ??
+      parsedJson.millilitres ??
+      parsedJson.milliliters ??
+      parsedJson.nombreDeMililitres;
+    const timeCandidate = parsedJson.time ?? parsedJson.timestamp;
+
+    const amountMl = Number(amountCandidate);
+    const time = Number(timeCandidate);
+    const hasValidPacket = Number.isFinite(amountMl) && amountMl > 0 && Number.isFinite(time) && time > 0;
+    if (!hasValidPacket) {
+      return false;
+    }
+
+    try {
+      await hydrationApi.log({
+        amountMl,
+        time,
+        userId: user?.id,
+      });
+
+      setStatusMsg('Donnee hydratation envoyee au backend (' + amountMl + ' ml)');
+      setWeightValue(amountMl / 1000);
+      await sendProtocolResponse('OK');
+    } catch (e: any) {
+      setStatusMsg('Erreur backend hydratation: ' + e.message);
+      await sendProtocolResponse('ERROR');
+    }
+
+    return true;
+  }, [sendProtocolResponse, user?.id]);
+
   // --- Conectar a la ESP32 ---
   const connectToESP32 = useCallback(async () => {
     if (isScanning || isConnected) {
@@ -147,7 +211,7 @@ export function useBLE() {
           monitorSubscriptionRef.current = connected.monitorCharacteristicForService(
             SERVICE_UUID,
             CHARACTERISTIC_UUID,
-            (err, characteristic) => {
+            async (err, characteristic) => {
               if (err) {
                 setStatusMsg('Erreur de notification: ' + err.message);
                 return;
@@ -155,6 +219,10 @@ export function useBLE() {
               if (characteristic?.value) {
                 // El valor llega en Base64, lo decodificamos
                 const raw = decodeBase64(characteristic.value);
+                const wasHydrationPacket = await processHydrationPacket(raw);
+                if (wasHydrationPacket) {
+                  return;
+                }
                 const parsed = parseFloat(raw);
                 if (!isNaN(parsed)) setWeightValue(parsed);
               }
@@ -217,7 +285,7 @@ export function useBLE() {
         setStatusMsg('ESP32 introuvable');
       }
     }, 10000);
-  }, [decodeBase64, isConnected, isScanning, manager, requestPermissions, sendCurrentUnixTimestamp, stopActiveScan]);
+  }, [decodeBase64, isConnected, isScanning, manager, processHydrationPacket, requestPermissions, sendCurrentUnixTimestamp, stopActiveScan]);
 
   // --- Desconectar ---
   const disconnect = useCallback(async () => {
