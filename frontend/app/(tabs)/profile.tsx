@@ -21,7 +21,7 @@ export default function ProfileScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const [menuVisible, setMenuVisible] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   // Mock user data
   const userProfile = {
@@ -73,12 +73,12 @@ export default function ProfileScreen() {
             <Text style={styles.photoPlaceholder}>👤</Text>
           </View>
 
-          <Text style={[styles.profileName, { color: colors.text }]}>{userProfile.name}</Text>
+          <Text style={[styles.profileName, { color: colors.text }]}>{user ? `${user.prenom} ${user.nom}` : 'Prénom Nom'}</Text>
           <Text style={[styles.profileUsername, { color: Palette.secondary }]}>
-            {userProfile.username}
+            {user?.username || 'Nom d\'Utilisateur'}
           </Text>
 
-          <Text style={[styles.profileBio, { color: colors.icon }]}>{userProfile.bio}</Text>
+          <Text style={[styles.profileBio, { color: colors.icon }]}>{user?.bio || 'Écris ta biographie ici...'}</Text>
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
@@ -124,42 +124,42 @@ export default function ProfileScreen() {
 
           <View style={styles.infoItem}>
             <Text style={[styles.infoLabel, { color: colors.icon }]}>Email</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{userProfile.email}</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>{user?.email || 'Email non spécifié'}</Text>
           </View>
 
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
           <View style={styles.infoItem}>
             <Text style={[styles.infoLabel, { color: colors.icon }]}>Âge</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{userProfile.age} ans</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>{user?.age || 'Âge non spécifié'} ans</Text>
           </View>
 
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
           <View style={styles.infoItem}>
             <Text style={[styles.infoLabel, { color: colors.icon }]}>Sexe</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{userProfile.gender}</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>{user?.gender || 'Sexe non spécifié'}</Text>
           </View>
 
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
           <View style={styles.infoItem}>
             <Text style={[styles.infoLabel, { color: colors.icon }]}>Région</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{userProfile.region}</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>{user?.region || 'Région non spécifiée'}</Text>
           </View>
 
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
           <View style={styles.infoItem}>
             <Text style={[styles.infoLabel, { color: colors.icon }]}>Poids</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{userProfile.weight}</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>{user?.weight || 'Poids non spécifié'}</Text>
           </View>
 
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
           <View style={styles.infoItem}>
             <Text style={[styles.infoLabel, { color: colors.icon }]}>Activité sportive</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{userProfile.sport}</Text>
+            <Text style={[styles.infoValue, { color: colors.text }]}>{user?.sport || 'Activité non spécifiée'}</Text>
           </View>
         </View>
 
