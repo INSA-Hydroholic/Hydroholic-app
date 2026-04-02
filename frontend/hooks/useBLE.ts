@@ -20,7 +20,6 @@ export function useBLE() {
   const [statusMsg, setStatusMsg]       = useState('Deconnecte');
   const deviceRef = useRef<Device | null>(null);
   const monitorSubscriptionRef = useRef<{ remove: () => void } | null>(null);
-  const timeRequestSubscriptionRef = useRef<{ remove: () => void } | null>(null);
   const scanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   if (!managerRef.current) {
@@ -75,8 +74,8 @@ export function useBLE() {
     return true;
   }, []);
 
-  const sendCurrentUnixTimestamp = useCallback(async (requestedByEsp32 = false) => {
-    if (!deviceRef.current || !isConnected) {
+  const sendCurrentUnixTimestamp = useCallback(async () => {
+    if (!deviceRef.current) {
       setStatusMsg('Connectez l\'ESP32 avant d\'envoyer l\'heure.');
       return;
     }
@@ -91,31 +90,27 @@ export function useBLE() {
         encodedTimestamp
       );
 
-      if (requestedByEsp32) {
-        setStatusMsg('Timestamp envoye sur demande ESP32: ' + now);
-      } else {
-        setStatusMsg('Timestamp envoye: ' + now);
-      }
+      setStatusMsg('Timestamp envoye: ' + now);
     } catch (e: any) {
       setStatusMsg('Erreur lors de l\'envoi du timestamp: ' + e.message);
     }
-  }, [encodeToBase64, isConnected]);
+  }, [encodeToBase64]);
 
   const sendProtocolResponse = useCallback(async (message: 'OK' | 'ERROR') => {
-    if (!deviceRef.current || !isConnected) {
+    if (!deviceRef.current) {
       return;
     }
 
     try {
       await deviceRef.current.writeCharacteristicWithResponseForService(
         SERVICE_UUID,
-        CHARACTERISTIC_UUID,
+        TIME_CHARACTERISTIC_UUID,
         encodeToBase64(message)
       );
     } catch (e: any) {
-      setStatusMsg('Erreur envoi reponse protocole: ' + e.message);
+      setStatusMsg('Erreur envoi ACK BLE: ' + e.message);
     }
-  }, [encodeToBase64, isConnected]);
+  }, [encodeToBase64]);
 
   const processHydrationPacket = useCallback(async (rawValue: string) => {
     let parsedJson: any;
@@ -185,8 +180,6 @@ export function useBLE() {
 
     monitorSubscriptionRef.current?.remove();
     monitorSubscriptionRef.current = null;
-    timeRequestSubscriptionRef.current?.remove();
-    timeRequestSubscriptionRef.current = null;
 
     manager.startDeviceScan(null, null, async (error, device) => {
       if (error) {
@@ -217,45 +210,23 @@ export function useBLE() {
                 return;
               }
               if (characteristic?.value) {
-                // El valor llega en Base64, lo decodificamos
+               
                 const raw = decodeBase64(characteristic.value);
                 const wasHydrationPacket = await processHydrationPacket(raw);
                 if (wasHydrationPacket) {
                   return;
                 }
                 const parsed = parseFloat(raw);
-                if (!isNaN(parsed)) setWeightValue(parsed);
+                if (!isNaN(parsed)) {
+                  setWeightValue(parsed);
+                  await sendProtocolResponse('OK');
+                }
               }
             }
           );
 
-          timeRequestSubscriptionRef.current = connected.monitorCharacteristicForService(
-            SERVICE_UUID,
-            TIME_CHARACTERISTIC_UUID,
-            async (err, characteristic) => {
-              if (err) {
-                setStatusMsg('Erreur de notification horaire: ' + err.message);
-                return;
-              }
-
-              if (!characteristic?.value) {
-                return;
-              }
-
-              const requestRaw = decodeBase64(characteristic.value).trim();
-              const normalizedRequest = requestRaw.toUpperCase();
-              const shouldSendTime =
-                normalizedRequest === 'REQ_TIME' ||
-                normalizedRequest === 'REQUEST_TIME' ||
-                normalizedRequest === 'GET_TIME' ||
-                normalizedRequest === 'TIME?' ||
-                normalizedRequest === 'SYNC_TIME';
-
-              if (shouldSendTime) {
-                await sendCurrentUnixTimestamp(true);
-              }
-            }
-          );
+          // TIME_CHAR is write-only on ESP32, so we sync time from app right after connect.
+          await sendCurrentUnixTimestamp();
 
           // Detectar desconexión
           connected.onDisconnected(() => {
@@ -264,8 +235,6 @@ export function useBLE() {
             deviceRef.current = null;
             monitorSubscriptionRef.current?.remove();
             monitorSubscriptionRef.current = null;
-            timeRequestSubscriptionRef.current?.remove();
-            timeRequestSubscriptionRef.current = null;
             stopActiveScan();
             setStatusMsg('Deconnecte');
           });
@@ -285,15 +254,13 @@ export function useBLE() {
         setStatusMsg('ESP32 introuvable');
       }
     }, 10000);
-  }, [decodeBase64, isConnected, isScanning, manager, processHydrationPacket, requestPermissions, sendCurrentUnixTimestamp, stopActiveScan]);
+  }, [decodeBase64, isConnected, isScanning, manager, processHydrationPacket, requestPermissions, sendCurrentUnixTimestamp, sendProtocolResponse, stopActiveScan]);
 
   // --- Desconectar ---
   const disconnect = useCallback(async () => {
     if (deviceRef.current) {
       monitorSubscriptionRef.current?.remove();
       monitorSubscriptionRef.current = null;
-      timeRequestSubscriptionRef.current?.remove();
-      timeRequestSubscriptionRef.current = null;
       await deviceRef.current.cancelConnection();
       deviceRef.current = null;
       stopActiveScan();
@@ -308,8 +275,6 @@ export function useBLE() {
       stopActiveScan();
       monitorSubscriptionRef.current?.remove();
       monitorSubscriptionRef.current = null;
-      timeRequestSubscriptionRef.current?.remove();
-      timeRequestSubscriptionRef.current = null;
       if (deviceRef.current) {
         deviceRef.current.cancelConnection().catch(() => undefined);
         deviceRef.current = null;

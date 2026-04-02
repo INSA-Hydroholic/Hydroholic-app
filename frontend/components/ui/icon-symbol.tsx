@@ -15,10 +15,20 @@ type IconSymbolName = keyof typeof MAPPING;
  */
 const MAPPING = {
   'house.fill': 'home',
-  'paperplane.fill': 'send',
-  'chevron.left.forwardslash.chevron.right': 'code',
-  'chevron.right': 'chevron-right',
-} as IconMapping;
+  'chart.bar.xaxis': 'bar-chart',
+
+
+  'star.fill': 'star',
+
+
+  'list.number': 'format-list-numbered',
+  'person.fill': 'person',
+
+
+  'person': 'person-outline',
+  'settings': 'settings',
+  'trophy.fill': 'emoji-events',
+} as unknown as IconMapping;
 
 /**
  * An icon component that uses native SF Symbols on iOS, and Material Icons on Android and web.
