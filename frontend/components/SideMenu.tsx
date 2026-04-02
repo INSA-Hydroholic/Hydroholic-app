@@ -7,9 +7,11 @@ import {
   ScrollView,
   StatusBar,
   SafeAreaView,
+  Alert,
 } from 'react-native';
 import { Colors, Palette } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { connectToHydroholicBottle } from '@/utils/bluetooth';
 
 export const SideMenu: React.FC<{ visible: boolean; onClose: () => void; onItemPress: (item: string) => void }> = ({
   visible,
@@ -22,6 +24,7 @@ export const SideMenu: React.FC<{ visible: boolean; onClose: () => void; onItemP
   if (!visible) return null;
 
   const menuItems = [
+    { label: 'Connecter gourde', icon: '🫧' },
     { label: 'Accueil', icon: '🏠' },
     { label: 'Historique', icon: '📊' },
     { label: 'Défis', icon: '🏆' },
@@ -58,7 +61,14 @@ export const SideMenu: React.FC<{ visible: boolean; onClose: () => void; onItemP
             <Pressable
               key={index}
               style={[styles.menuItem, { borderBottomColor: colors.border }]}
-              onPress={() => {
+              onPress={async () => {
+                if (item.label === 'Connecter gourde') {
+                  const result = await connectToHydroholicBottle();
+                  Alert.alert(result.ok ? 'Bluetooth connecté' : 'Erreur Bluetooth', result.message);
+                  onClose();
+                  return;
+                }
+
                 onItemPress(item.label);
                 onClose();
               }}>
