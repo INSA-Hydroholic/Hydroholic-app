@@ -23,6 +23,7 @@ export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
     const newErrors: { [key: string]: string } = {};
@@ -35,10 +36,14 @@ export default function LoginScreen() {
       return;
     }
 
+    setIsLoading(true);
     try {
-      await login(username, password); 
-    } catch (error) {
-      console.error("Erreur lors de la connexion", error);
+      await login(username, password);
+      // Navigation automatique gérée par AuthContext
+    } catch (error: any) {
+      setErrors({ general: error.message || 'Erreur de connexion' });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -57,13 +62,19 @@ export default function LoginScreen() {
         <View style={styles.formContainer}>
           <Text style={[styles.title, { color: colors.text }]}>Connexion</Text>
 
+          {errors.general && (
+            <Text style={[styles.errorText, { color: 'red' }]}>
+              {errors.general}
+            </Text>
+          )}
+
           <InputField
             label="Nom d'utilisateur ou email"
             placeholder="Entrez votre nom d'utilisateur ou email"
             value={username}
             onChangeText={(text) => {
               setUsername(text);
-              setErrors({ ...errors, username: '' });
+              setErrors({ ...errors, username: '', general: '' });
             }}
             error={errors.username}
           />
@@ -74,7 +85,7 @@ export default function LoginScreen() {
             value={password}
             onChangeText={(text) => {
               setPassword(text);
-              setErrors({ ...errors, password: '' });
+              setErrors({ ...errors, password: '', general: '' });
             }}
             type="password"
             error={errors.password}
@@ -87,10 +98,11 @@ export default function LoginScreen() {
           </Pressable>
 
           <Button
-            title="Se connecter"
+            title={isLoading ? "Connexion..." : "Se connecter"}
             onPress={handleLogin}
             size="large"
             style={styles.button}
+            disabled={isLoading}
           />
         </View>
 
@@ -141,6 +153,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 24,
     textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 14,
+    marginBottom: 16,
+    textAlign: 'center',
+    fontWeight: '500',
   },
   forgotPassword: {
     fontSize: 12,
