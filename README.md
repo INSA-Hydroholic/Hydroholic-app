@@ -18,6 +18,8 @@ These instructions are for someone running a React Native app for the first time
 3. Install **Android Platform Tools** (for `adb`):
     - https://developer.android.com/tools/releases/platform-tools
 4. (Windows) Add the `platform-tools` folder to your PATH so `adb` works in terminal.
+5. Install the **Java SDK** (version 21):
+    - https://www.oracle.com/java/technologies/downloads/#jdk21-windows
 
 Check installation in a terminal:
 
@@ -25,6 +27,7 @@ Check installation in a terminal:
 node -v
 npm -v
 adb version
+java -version
 ```
 
 ## 2) Prepare your Android phone
@@ -78,6 +81,9 @@ What this does:
 - installs it on your connected phone through `adb`
 
 Wait until the build finishes and the app is installed.
+### Possible errors:
+- **ANDROID_HOME error**: you need to set the `ANDROID_HOME` environment variable to your Android SDK path. In Windows, you can set it in-place with: `set ANDROID_HOME=C:\Path\To\Android\Sdk`.
+- **SDK Licenses not accepted**: you need to accept the Android SDK licenses by running `sdkmanager --licenses`. If `sdkmanager` is not found, download the command line tools from https://developer.android.com/studio#command-line-tools-only, extract it into the ANDROID_HOME folder and create the `latest` folder. Move all files and folders into it and run `sdkmanager --licenses` from the `cmdline-tools/bin` folder.
 
 ## 7) Start the Metro bundler for development client
 
