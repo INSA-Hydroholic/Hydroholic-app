@@ -18,6 +18,7 @@ export function useBLE() {
   const [isScanning, setIsScanning]     = useState(false);
   const [weightValue, setWeightValue]   = useState<number | null>(null);
   const [statusMsg, setStatusMsg]       = useState('Deconnecte');
+  const [logs, setLogs]                 = useState<string[]>([]);
   const deviceRef = useRef<Device | null>(null);
   const monitorSubscriptionRef = useRef<{ remove: () => void } | null>(null);
   const scanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -41,6 +42,11 @@ export function useBLE() {
       return global.atob(value);
     }
     return Buffer.from(value, 'base64').toString('utf-8');
+  }, []);
+
+  const pushLog = useCallback((msg: string) => {
+    const entry = `${new Date().toLocaleTimeString()} - ${msg}`;
+    setLogs((prev) => [entry, ...prev].slice(0, 200));
   }, []);
 
   const encodeToBase64 = useCallback((value: string): string => {
@@ -212,13 +218,16 @@ export function useBLE() {
               if (characteristic?.value) {
                
                 const raw = decodeBase64(characteristic.value);
+                pushLog(`RX: ${raw}`);
                 const wasHydrationPacket = await processHydrationPacket(raw);
                 if (wasHydrationPacket) {
+                  pushLog(`Processed hydration packet: ${raw}`);
                   return;
                 }
                 const parsed = parseFloat(raw);
                 if (!isNaN(parsed)) {
                   setWeightValue(parsed);
+                  pushLog(`Parsed weight: ${parsed}`);
                   await sendProtocolResponse('OK');
                 }
               }
@@ -291,5 +300,6 @@ export function useBLE() {
     statusMsg,
     connectToESP32,
     disconnect,
+    logs,
   };
 }

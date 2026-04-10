@@ -33,6 +33,7 @@ export default function HomeScreen() {
     statusMsg,
     connectToESP32,
     disconnect,
+    logs,
   } = useBLE();
 
   // Mock data
@@ -98,6 +99,19 @@ export default function HomeScreen() {
 
       </View>
 
+      <View style={styles.logContainer}>
+        <Text style={styles.logTitle}>BLE Log</Text>
+        <ScrollView style={styles.logBox}>
+          {logs && logs.length > 0 ? (
+            logs.map((l, idx) => (
+              <Text key={idx} style={styles.logLine}>{l}</Text>
+            ))
+          ) : (
+            <Text style={styles.logEmpty}>No BLE messages yet.</Text>
+          )}
+        </ScrollView>
+      </View>
+
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Hydration Card */}
         <HydrationCard
@@ -157,4 +171,9 @@ const styles = StyleSheet.create({
   bleButtonConnect:    { backgroundColor: '#2196F3' },
   bleButtonDisconnect: { backgroundColor: '#f44336' },
   bleButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  logContainer: { paddingHorizontal: 16, paddingVertical: 8 },
+  logTitle: { fontSize: 14, fontWeight: '700', marginBottom: 6 },
+  logBox: { maxHeight: 120, backgroundColor: '#fafafa', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#eee' },
+  logLine: { fontSize: 12, color: '#333', marginBottom: 4 },
+  logEmpty: { fontSize: 12, color: '#999', fontStyle: 'italic' },
 });
