@@ -16,12 +16,17 @@ export function useBLE() {
   const managerRef = useRef<BleManager | null>(null);
   const [isConnected, setIsConnected]   = useState(false);
   const [isScanning, setIsScanning]     = useState(false);
-  const [weightValue, setWeightValue]   = useState<number | null>(null);
+  const [weight, setWeight]             = useState<number | null>(null);
   const [statusMsg, setStatusMsg]       = useState('Deconnecte');
   const [logs, setLogs]                 = useState<string[]>([]);
   const deviceRef = useRef<Device | null>(null);
   const monitorSubscriptionRef = useRef<{ remove: () => void } | null>(null);
   const scanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  type HydrationPacket = {
+    weight: number;
+    time: number;
+  };
 
   if (!managerRef.current) {
     managerRef.current = new BleManager();
@@ -118,50 +123,81 @@ export function useBLE() {
     }
   }, [encodeToBase64]);
 
-  const processHydrationPacket = useCallback(async (rawValue: string) => {
+  const parseHydrationPacket = useCallback((rawValue: string): HydrationPacket | null => {
     let parsedJson: any;
     try {
       parsedJson = JSON.parse(rawValue);
     } catch {
-      return false;
+      return null;
     }
 
     if (!parsedJson || typeof parsedJson !== 'object') {
-      return false;
+      return null;
     }
 
-    const amountCandidate =
-      parsedJson.amountMl ??
-      parsedJson.ml ??
-      parsedJson.millilitres ??
-      parsedJson.milliliters ??
-      parsedJson.nombreDeMililitres;
-    const timeCandidate = parsedJson.time ?? parsedJson.timestamp;
+    const weightCandidate = parsedJson.weight;
+    const timeCandidate = parsedJson.timestamp;
 
-    const amountMl = Number(amountCandidate);
+    const weight = Number(weightCandidate);
     const time = Number(timeCandidate);
-    const hasValidPacket = Number.isFinite(amountMl) && amountMl > 0 && Number.isFinite(time) && time > 0;
+    const hasValidPacket = Number.isFinite(weight) && weight > 0 && Number.isFinite(time) && time > 0;
+
     if (!hasValidPacket) {
+      return null;
+    }
+
+    return {
+      weight: weight,
+      time,
+    };
+  }, []);
+
+  const pushHydrationPacketToBackend = useCallback(async (packet: HydrationPacket): Promise<boolean> => {
+    const userId = String(user?.id ?? '');
+
+    if (!userId) {
+      setStatusMsg('Utilisateur non connecte: impossible d\'envoyer l\'hydratation.');
+      await sendProtocolResponse('ERROR');
       return false;
     }
 
     try {
-      await hydrationApi.log({
-        amountMl,
-        time,
-        userId: user?.id,
+      await hydrationApi.pushMeasurement({
+        userId,
+        weight: packet.weight
       });
 
-      setStatusMsg('Donnee hydratation envoyee au backend (' + amountMl + ' ml)');
-      setWeightValue(amountMl / 1000);
+      setStatusMsg('Donnee hydratation envoyee au backend (' + packet.weight + ' g)');
+      setWeight(packet.weight / 1000);
       await sendProtocolResponse('OK');
+      return true;
     } catch (e: any) {
       setStatusMsg('Erreur backend hydratation: ' + e.message);
       await sendProtocolResponse('ERROR');
+      return false;
+    }
+  }, [sendProtocolResponse, user?.id]);
+
+  const handleIncomingBleMessage = useCallback(async (raw: string) => {
+    pushLog(`RX: ${raw}`);
+
+    const hydrationPacket = parseHydrationPacket(raw);
+    if (hydrationPacket) {
+      pushLog(`Hydration packet parsed: ${JSON.stringify(hydrationPacket)}`);
+      await pushHydrationPacketToBackend(hydrationPacket);
+      return;
     }
 
-    return true;
-  }, [sendProtocolResponse, user?.id]);
+    const parsed = parseFloat(raw);
+    if (!isNaN(parsed)) {
+      setWeight(parsed);
+      pushLog(`Parsed weight: ${parsed}`);
+      await sendProtocolResponse('OK');
+      return;
+    }
+
+    pushLog('Unrecognized BLE payload ignored.');
+  }, [parseHydrationPacket, pushHydrationPacketToBackend, pushLog, sendProtocolResponse]);
 
   // --- Conectar a la ESP32 ---
   const connectToESP32 = useCallback(async () => {
@@ -216,20 +252,8 @@ export function useBLE() {
                 return;
               }
               if (characteristic?.value) {
-               
                 const raw = decodeBase64(characteristic.value);
-                pushLog(`RX: ${raw}`);
-                const wasHydrationPacket = await processHydrationPacket(raw);
-                if (wasHydrationPacket) {
-                  pushLog(`Processed hydration packet: ${raw}`);
-                  return;
-                }
-                const parsed = parseFloat(raw);
-                if (!isNaN(parsed)) {
-                  setWeightValue(parsed);
-                  pushLog(`Parsed weight: ${parsed}`);
-                  await sendProtocolResponse('OK');
-                }
+                await handleIncomingBleMessage(raw);
               }
             }
           );
@@ -240,7 +264,7 @@ export function useBLE() {
           // Detectar desconexión
           connected.onDisconnected(() => {
             setIsConnected(false);
-            setWeightValue(null);
+            setWeight(null);
             deviceRef.current = null;
             monitorSubscriptionRef.current?.remove();
             monitorSubscriptionRef.current = null;
@@ -263,7 +287,7 @@ export function useBLE() {
         setStatusMsg('ESP32 introuvable');
       }
     }, 10000);
-  }, [decodeBase64, isConnected, isScanning, manager, processHydrationPacket, requestPermissions, sendCurrentUnixTimestamp, sendProtocolResponse, stopActiveScan]);
+  }, [decodeBase64, handleIncomingBleMessage, isConnected, isScanning, manager, requestPermissions, sendCurrentUnixTimestamp, stopActiveScan]);
 
   // --- Desconectar ---
   const disconnect = useCallback(async () => {
@@ -274,7 +298,7 @@ export function useBLE() {
       deviceRef.current = null;
       stopActiveScan();
       setIsConnected(false);
-      setWeightValue(null);
+      setWeight(null);
       setStatusMsg('Deconnecte');
     }
   }, [stopActiveScan]);
@@ -296,7 +320,7 @@ export function useBLE() {
   return {
     isConnected,
     isScanning,
-    weightValue,
+    weight,
     statusMsg,
     connectToESP32,
     disconnect,

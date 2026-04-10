@@ -4,6 +4,16 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 
 ## Get started
 
+### Backend endpoint configuration
+
+The app reads the backend base URL from `.env`:
+
+```bash
+EXPO_PUBLIC_API_URL=http://localhost:4000/api
+```
+
+Use your machine IP instead of `localhost` when testing on a physical device.
+
 1. Install dependencies
 
    ```bash

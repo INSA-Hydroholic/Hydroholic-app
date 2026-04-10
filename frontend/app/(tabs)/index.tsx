@@ -29,7 +29,7 @@ export default function HomeScreen() {
   const {
     isConnected,
     isScanning,
-    weightValue,
+    weight,
     statusMsg,
     connectToESP32,
     disconnect,
@@ -81,8 +81,8 @@ export default function HomeScreen() {
 
       <View style={styles.bleContainer}>
         <Text style={styles.bleStatus}>{statusMsg}</Text>
-        {weightValue !== null && (
-          <Text style={styles.bleWeight}>💧 {weightValue.toFixed(2)} L</Text>
+        {weight !== null && (
+          <Text style={styles.bleWeight}>💧 {weight.toFixed(2)} L</Text>
         )}
         <TouchableOpacity
           style={[styles.bleButton, isConnected ? styles.bleButtonDisconnect : styles.bleButtonConnect]}
