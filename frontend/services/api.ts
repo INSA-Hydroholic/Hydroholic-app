@@ -65,7 +65,7 @@ type LoadCellMeasurementPayload = {
 export const hydrationApi = {
   pushMeasurement: (payload: LoadCellMeasurementPayload) => {
     const weight = Math.round(payload.weight);
-    return request(`/api/users/${payload.userId}/water`, {
+    return request(`/users/${payload.userId}/water`, {
       method: 'POST',
       body: { weight }
     });

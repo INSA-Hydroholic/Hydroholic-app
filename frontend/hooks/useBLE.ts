@@ -124,31 +124,26 @@ export function useBLE() {
   }, [encodeToBase64]);
 
   const parseHydrationPacket = useCallback((rawValue: string): HydrationPacket | null => {
-    let parsedJson: any;
-    try {
-      parsedJson = JSON.parse(rawValue);
-    } catch {
+    // Packet's expected format: "HIST:timestamp,weight"
+    if (!rawValue.startsWith('HIST:')) {
       return null;
     }
 
-    if (!parsedJson || typeof parsedJson !== 'object') {
+    const [timestamp, weight] = rawValue.slice(5).split(',');
+    if (!timestamp || !weight) {
       return null;
     }
 
-    const weightCandidate = parsedJson.weight;
-    const timeCandidate = parsedJson.timestamp;
+    const time = Number(timestamp);
+    const num_weight = Number(weight);
 
-    const weight = Number(weightCandidate);
-    const time = Number(timeCandidate);
-    const hasValidPacket = Number.isFinite(weight) && weight > 0 && Number.isFinite(time) && time > 0;
-
-    if (!hasValidPacket) {
+    if (!Number.isFinite(time) || !Number.isFinite(num_weight) || time <= 0 || num_weight <= 0) {
       return null;
     }
 
     return {
-      weight: weight,
-      time,
+      weight: num_weight,
+      time
     };
   }, []);
 
@@ -161,12 +156,14 @@ export function useBLE() {
       return false;
     }
 
+    pushLog(`Envoi du packet d'hydratation au backend: ${JSON.stringify(packet)}`);
     try {
       await hydrationApi.pushMeasurement({
         userId,
         weight: packet.weight
       });
 
+      pushLog('Packet d\'hydratation envoye avec succes au backend.');
       setStatusMsg('Donnee hydratation envoyee au backend (' + packet.weight + ' g)');
       setWeight(packet.weight / 1000);
       await sendProtocolResponse('OK');
@@ -196,7 +193,7 @@ export function useBLE() {
       return;
     }
 
-    pushLog('Unrecognized BLE payload ignored.');
+    pushLog(`Unrecognized BLE payload ignored: ${raw}`);
   }, [parseHydrationPacket, pushHydrationPacketToBackend, pushLog, sendProtocolResponse]);
 
   // --- Conectar a la ESP32 ---
