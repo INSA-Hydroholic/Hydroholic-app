@@ -33,7 +33,8 @@
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "package": "com.josuevega7.frontend"
+      "package": "com.josuevega7.frontend",
+      "usesCleartextTraffic": true
     },
     "web": {
       "output": "static",
