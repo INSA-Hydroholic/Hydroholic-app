@@ -58,3 +58,17 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+
+# Production build
+To create a production build of your app, from the `android` directory, run (under Windows):
+
+```bash
+gradlew assembleRelease
+```
+
+This will generate an APK file in `android/app/build/outputs/apk/release/app-release.apk` that you can distribute. To install it with ADB, run:
+
+```bash
+adb install -r app/build/outputs/apk/release/app-release.apk
+```
