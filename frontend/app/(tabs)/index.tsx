@@ -19,6 +19,9 @@ import { ChallengeCard } from '@/components/ChallengeCard';
 import { RankingCard } from '@/components/RankingCard';
 import { HistoryCard } from '@/components/HistoryCard';
 import { useBLE } from '@/hooks/useBLE'; 
+import { LoadCellGraph } from '@/components/LoadCellGraph';
+
+const MAX_LOAD_CELL_POINTS = 1000;
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
@@ -27,6 +30,7 @@ export default function HomeScreen() {
   const [menuVisible, setMenuVisible] = useState(false);
   const [hydrationAmount, setHydrationAmount] = useState(1.8);
   const [hydrationGoal] = useState(3.2);
+  const [loadCellHistory, setLoadCellHistory] = useState<Array<{ value: number; label: string }>>([]);
   const {
     isConnected,
     isScanning,
@@ -47,6 +51,30 @@ export default function HomeScreen() {
       setScaleInput(scaleFactor.toFixed(6));
     }
   }, [scaleFactor]);
+
+  useEffect(() => {
+    if (weight === null || !Number.isFinite(weight)) {
+      return;
+    }
+
+    setLoadCellHistory((prev) => {
+      const hasSameValue = prev.length > 0 && Math.abs(prev[prev.length - 1].value - weight) < 0.0001;
+      if (hasSameValue) {
+        return prev;
+      }
+
+      const point = {
+        value: weight,
+        label: new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        }),
+      };
+
+      return [...prev, point].slice(-MAX_LOAD_CELL_POINTS);
+    });
+  }, [weight]);
 
   // Mock data
   const rankings = [
@@ -161,6 +189,8 @@ export default function HomeScreen() {
         )}
 
       </View>
+
+      <LoadCellGraph points={loadCellHistory} />
 
       <View style={styles.logContainer}>
         <Text style={styles.logTitle}>BLE Log</Text>
