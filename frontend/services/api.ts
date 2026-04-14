@@ -64,7 +64,7 @@ type LoadCellMeasurementPayload = {
 
 export const hydrationApi = {
   pushMeasurement: (payload: LoadCellMeasurementPayload) => {
-    const weight = Math.round(payload.weight);
+    const weight = Math.round(payload.weight * 100) / 100; // Round to 2 decimal places - toFixed returns a string, so we use Math.round instead
     return request(`/users/${payload.userId}/water`, {
       method: 'POST',
       body: { weight }
