@@ -23,6 +23,7 @@ export function useBLE() {
   const deviceRef = useRef<Device | null>(null);
   const monitorSubscriptionRef = useRef<{ remove: () => void } | null>(null);
   const scanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const histBufferRef = useRef('');
 
   type HydrationPacket = {
     weight: number;
@@ -159,12 +160,14 @@ export function useBLE() {
     }
 
     const time = Number(timestamp);
+    console.log(`Parsing hydration packet - timestamp: ${timestamp}, weight: ${weight}`);
     const num_weight = Number(weight);
 
     if (!Number.isFinite(time) || !Number.isFinite(num_weight) || time <= 0 || num_weight <= 0) {
       return null;
     }
 
+    console.log(`Parsed hydration packet - timestamp: ${time}, weight: ${num_weight}`);
     return {
       weight: num_weight,
       time
@@ -241,6 +244,31 @@ export function useBLE() {
     pushLog(`Unrecognized BLE payload ignored: ${raw}`);
   }, [parseHydrationPacket, pushHydrationPacketToBackend, pushLog, sendProtocolResponse]);
 
+  const handleIncomingBleChunk = useCallback(async (rawChunk: string) => {
+    const chunk = rawChunk.replace(/\r/g, '');
+
+    // HIST payloads can exceed BLE default MTU and arrive fragmented.
+    if (histBufferRef.current.length > 0 || chunk.startsWith('HIST:')) {
+      histBufferRef.current += chunk;
+
+      let newlineIndex = histBufferRef.current.indexOf('\n');
+      while (newlineIndex !== -1) {
+        const frame = histBufferRef.current.slice(0, newlineIndex).trim();
+        histBufferRef.current = histBufferRef.current.slice(newlineIndex + 1);
+
+        if (frame.length > 0) {
+          await handleIncomingBleMessage(frame);
+        }
+
+        newlineIndex = histBufferRef.current.indexOf('\n');
+      }
+
+      return;
+    }
+
+    await handleIncomingBleMessage(chunk.trim());
+  }, [handleIncomingBleMessage]);
+
   // --- Conectar a la ESP32 ---
   const connectToESP32 = useCallback(async () => {
     if (isScanning || isConnected) {
@@ -280,6 +308,14 @@ export function useBLE() {
         try {
           const connected = await device.connect();
           await connected.discoverAllServicesAndCharacteristics();
+          if (Platform.OS === 'android') {
+            try {
+              await connected.requestMTU(185);
+            } catch {
+              // Keep working with default MTU if request fails.
+            }
+          }
+          histBufferRef.current = '';
           deviceRef.current = connected;
           setIsConnected(true);
           setStatusMsg('Connecte a ' + (connected.name ?? 'ESP32'));
@@ -295,7 +331,7 @@ export function useBLE() {
               }
               if (characteristic?.value) {
                 const raw = decodeBase64(characteristic.value);
-                await handleIncomingBleMessage(raw);
+                await handleIncomingBleChunk(raw);
               }
             }
           );
@@ -308,6 +344,7 @@ export function useBLE() {
           connected.onDisconnected(() => {
             setIsConnected(false);
             setWeight(null);
+            histBufferRef.current = '';
             deviceRef.current = null;
             monitorSubscriptionRef.current?.remove();
             monitorSubscriptionRef.current = null;
@@ -330,13 +367,14 @@ export function useBLE() {
         setStatusMsg('ESP32 introuvable');
       }
     }, 10000);
-  }, [decodeBase64, handleIncomingBleMessage, isConnected, isScanning, manager, requestPermissions, requestScaleFactor, sendCurrentUnixTimestamp, stopActiveScan]);
+  }, [decodeBase64, handleIncomingBleChunk, isConnected, isScanning, manager, requestPermissions, requestScaleFactor, sendCurrentUnixTimestamp, stopActiveScan]);
 
   // --- Desconectar ---
   const disconnect = useCallback(async () => {
     if (deviceRef.current) {
       monitorSubscriptionRef.current?.remove();
       monitorSubscriptionRef.current = null;
+      histBufferRef.current = '';
       await deviceRef.current.cancelConnection();
       deviceRef.current = null;
       stopActiveScan();
@@ -351,6 +389,7 @@ export function useBLE() {
       stopActiveScan();
       monitorSubscriptionRef.current?.remove();
       monitorSubscriptionRef.current = null;
+      histBufferRef.current = '';
       if (deviceRef.current) {
         deviceRef.current.cancelConnection().catch(() => undefined);
         deviceRef.current = null;
