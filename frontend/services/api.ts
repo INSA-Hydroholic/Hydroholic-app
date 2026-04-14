@@ -1,4 +1,4 @@
-const API_URL = process.env.API_URL || 'http://localhost:4000/api';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000/api';
 let authToken: string | null = null;
 
 export const setAuthToken = (token: string | null) => {
@@ -57,8 +57,17 @@ export const usersApi = {
   ranking: () => request('/users/ranking')
 };
 
+type LoadCellMeasurementPayload = {
+  userId: string;
+  weight: number;
+};
+
 export const hydrationApi = {
-  log: (payload: { amountMl: number; time: number; userId?: string }) =>
-    request('/hydration', { method: 'POST', body: payload }),
-  history: () => request('/hydration')
+  pushMeasurement: (payload: LoadCellMeasurementPayload) => {
+    const weight = Math.round(payload.weight * 100) / 100; // Round to 2 decimal places - toFixed returns a string, so we use Math.round instead
+    return request(`/users/${payload.userId}/water`, {
+      method: 'POST',
+      body: { weight }
+    });
+  }
 };

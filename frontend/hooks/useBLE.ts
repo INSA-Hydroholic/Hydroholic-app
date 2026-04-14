@@ -16,11 +16,17 @@ export function useBLE() {
   const managerRef = useRef<BleManager | null>(null);
   const [isConnected, setIsConnected]   = useState(false);
   const [isScanning, setIsScanning]     = useState(false);
-  const [weightValue, setWeightValue]   = useState<number | null>(null);
+  const [weight, setWeight]             = useState<number | null>(null);
   const [statusMsg, setStatusMsg]       = useState('Deconnecte');
+  const [logs, setLogs]                 = useState<string[]>([]);
   const deviceRef = useRef<Device | null>(null);
   const monitorSubscriptionRef = useRef<{ remove: () => void } | null>(null);
   const scanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  type HydrationPacket = {
+    weight: number;
+    time: number;
+  };
 
   if (!managerRef.current) {
     managerRef.current = new BleManager();
@@ -43,12 +49,36 @@ export function useBLE() {
     return Buffer.from(value, 'base64').toString('utf-8');
   }, []);
 
+  const pushLog = useCallback((msg: string) => {
+    const entry = `${new Date().toLocaleTimeString()} - ${msg}`;
+    setLogs((prev) => [entry, ...prev].slice(0, 200));
+  }, []);
+
   const encodeToBase64 = useCallback((value: string): string => {
     if (typeof global.btoa === 'function') {
       return global.btoa(value);
     }
     return Buffer.from(value, 'utf-8').toString('base64');
   }, []);
+
+  const writeCommand = useCallback(async (message: string, errorPrefix: string): Promise<boolean> => {
+    if (!deviceRef.current) {
+      setStatusMsg('Connectez l\'ESP32 avant d\'envoyer une commande.');
+      return false;
+    }
+
+    try {
+      await deviceRef.current.writeCharacteristicWithResponseForService(
+        SERVICE_UUID,
+        TIME_CHARACTERISTIC_UUID,
+        encodeToBase64(message)
+      );
+      return true;
+    } catch (e: any) {
+      setStatusMsg(errorPrefix + e.message);
+      return false;
+    }
+  }, [encodeToBase64]);
 
   // --- Permisos Android ---
   const requestPermissions = useCallback(async (): Promise<boolean> => {
@@ -75,87 +105,96 @@ export function useBLE() {
   }, []);
 
   const sendCurrentUnixTimestamp = useCallback(async () => {
-    if (!deviceRef.current) {
-      setStatusMsg('Connectez l\'ESP32 avant d\'envoyer l\'heure.');
-      return;
-    }
-
-    try {
-      const now = Math.floor(Date.now() / 1000).toString();
-      const encodedTimestamp = encodeToBase64(now);
-
-      await deviceRef.current.writeCharacteristicWithResponseForService(
-        SERVICE_UUID,
-        TIME_CHARACTERISTIC_UUID,
-        encodedTimestamp
-      );
-
+    const now = Math.floor(Date.now() / 1000).toString();
+    if (await writeCommand(now, 'Erreur lors de l\'envoi du timestamp: ')) {
       setStatusMsg('Timestamp envoye: ' + now);
-    } catch (e: any) {
-      setStatusMsg('Erreur lors de l\'envoi du timestamp: ' + e.message);
     }
-  }, [encodeToBase64]);
+  }, [writeCommand]);
 
   const sendProtocolResponse = useCallback(async (message: 'OK' | 'ERROR') => {
-    if (!deviceRef.current) {
-      return;
+    await writeCommand(message, 'Erreur envoi ACK BLE: ');
+  }, [writeCommand]);
+
+  const tareLoadCell = useCallback(async () => {
+    const sent = await writeCommand('TARE', 'Erreur lors de la tare: ');
+    if (sent) {
+      setStatusMsg('Commande tare envoyée à l\'ESP32.');
+      pushLog('Commande BLE envoyée: TARE');
+    }
+  }, [pushLog, writeCommand]);
+
+  const parseHydrationPacket = useCallback((rawValue: string): HydrationPacket | null => {
+    // Packet's expected format: "HIST:timestamp,weight"
+    if (!rawValue.startsWith('HIST:')) {
+      return null;
     }
 
-    try {
-      await deviceRef.current.writeCharacteristicWithResponseForService(
-        SERVICE_UUID,
-        TIME_CHARACTERISTIC_UUID,
-        encodeToBase64(message)
-      );
-    } catch (e: any) {
-      setStatusMsg('Erreur envoi ACK BLE: ' + e.message);
+    const [timestamp, weight] = rawValue.slice(5).split(',');
+    if (!timestamp || !weight) {
+      return null;
     }
-  }, [encodeToBase64]);
 
-  const processHydrationPacket = useCallback(async (rawValue: string) => {
-    let parsedJson: any;
-    try {
-      parsedJson = JSON.parse(rawValue);
-    } catch {
+    const time = Number(timestamp);
+    const num_weight = Number(weight);
+
+    if (!Number.isFinite(time) || !Number.isFinite(num_weight) || time <= 0 || num_weight <= 0) {
+      return null;
+    }
+
+    return {
+      weight: num_weight,
+      time
+    };
+  }, []);
+
+  const pushHydrationPacketToBackend = useCallback(async (packet: HydrationPacket): Promise<boolean> => {
+    const userId = String(user?.id ?? '');
+
+    if (!userId) {
+      setStatusMsg('Utilisateur non connecte: impossible d\'envoyer l\'hydratation.');
+      await sendProtocolResponse('ERROR');
       return false;
     }
 
-    if (!parsedJson || typeof parsedJson !== 'object') {
-      return false;
-    }
-
-    const amountCandidate =
-      parsedJson.amountMl ??
-      parsedJson.ml ??
-      parsedJson.millilitres ??
-      parsedJson.milliliters ??
-      parsedJson.nombreDeMililitres;
-    const timeCandidate = parsedJson.time ?? parsedJson.timestamp;
-
-    const amountMl = Number(amountCandidate);
-    const time = Number(timeCandidate);
-    const hasValidPacket = Number.isFinite(amountMl) && amountMl > 0 && Number.isFinite(time) && time > 0;
-    if (!hasValidPacket) {
-      return false;
-    }
-
+    pushLog(`Envoi du packet d'hydratation au backend: ${JSON.stringify(packet)}`);
     try {
-      await hydrationApi.log({
-        amountMl,
-        time,
-        userId: user?.id,
+      await hydrationApi.pushMeasurement({
+        userId,
+        weight: packet.weight
       });
 
-      setStatusMsg('Donnee hydratation envoyee au backend (' + amountMl + ' ml)');
-      setWeightValue(amountMl / 1000);
+      pushLog('Packet d\'hydratation envoye avec succes au backend.');
+      setStatusMsg('Donnee hydratation envoyee au backend (' + packet.weight + ' g)');
+      setWeight(packet.weight / 1000);
       await sendProtocolResponse('OK');
+      return true;
     } catch (e: any) {
       setStatusMsg('Erreur backend hydratation: ' + e.message);
       await sendProtocolResponse('ERROR');
+      return false;
+    }
+  }, [sendProtocolResponse, user?.id]);
+
+  const handleIncomingBleMessage = useCallback(async (raw: string) => {
+    pushLog(`RX: ${raw}`);
+
+    const hydrationPacket = parseHydrationPacket(raw);
+    if (hydrationPacket) {
+      pushLog(`Hydration packet parsed: ${JSON.stringify(hydrationPacket)}`);
+      await pushHydrationPacketToBackend(hydrationPacket);
+      return;
     }
 
-    return true;
-  }, [sendProtocolResponse, user?.id]);
+    const parsed = parseFloat(raw);
+    if (!isNaN(parsed)) {
+      setWeight(parsed);
+      pushLog(`Parsed weight: ${parsed}`);
+      await sendProtocolResponse('OK');
+      return;
+    }
+
+    pushLog(`Unrecognized BLE payload ignored: ${raw}`);
+  }, [parseHydrationPacket, pushHydrationPacketToBackend, pushLog, sendProtocolResponse]);
 
   // --- Conectar a la ESP32 ---
   const connectToESP32 = useCallback(async () => {
@@ -210,17 +249,8 @@ export function useBLE() {
                 return;
               }
               if (characteristic?.value) {
-               
                 const raw = decodeBase64(characteristic.value);
-                const wasHydrationPacket = await processHydrationPacket(raw);
-                if (wasHydrationPacket) {
-                  return;
-                }
-                const parsed = parseFloat(raw);
-                if (!isNaN(parsed)) {
-                  setWeightValue(parsed);
-                  await sendProtocolResponse('OK');
-                }
+                await handleIncomingBleMessage(raw);
               }
             }
           );
@@ -231,7 +261,7 @@ export function useBLE() {
           // Detectar desconexión
           connected.onDisconnected(() => {
             setIsConnected(false);
-            setWeightValue(null);
+            setWeight(null);
             deviceRef.current = null;
             monitorSubscriptionRef.current?.remove();
             monitorSubscriptionRef.current = null;
@@ -254,7 +284,7 @@ export function useBLE() {
         setStatusMsg('ESP32 introuvable');
       }
     }, 10000);
-  }, [decodeBase64, isConnected, isScanning, manager, processHydrationPacket, requestPermissions, sendCurrentUnixTimestamp, sendProtocolResponse, stopActiveScan]);
+  }, [decodeBase64, handleIncomingBleMessage, isConnected, isScanning, manager, requestPermissions, sendCurrentUnixTimestamp, stopActiveScan]);
 
   // --- Desconectar ---
   const disconnect = useCallback(async () => {
@@ -265,7 +295,7 @@ export function useBLE() {
       deviceRef.current = null;
       stopActiveScan();
       setIsConnected(false);
-      setWeightValue(null);
+      setWeight(null);
       setStatusMsg('Deconnecte');
     }
   }, [stopActiveScan]);
@@ -287,9 +317,11 @@ export function useBLE() {
   return {
     isConnected,
     isScanning,
-    weightValue,
+    weight,
     statusMsg,
     connectToESP32,
     disconnect,
+    tareLoadCell,
+    logs,
   };
 }
