@@ -60,14 +60,39 @@ export const usersApi = {
 type LoadCellMeasurementPayload = {
   userId: string;
   weight: number;
+  source: 'app' | 'hydrobase';
+  measured_at: number | string; // UNIX timestamp in seconds or milliseconds
+};
+
+const toIsoTimestamp = (input: number | string): string => {
+  const numeric = typeof input === 'number' ? input : Number(input);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    throw new Error(`Invalid measured_at timestamp: ${input}`);
+  }
+
+  // ESP packets send Unix time in seconds. Keep millisecond compatibility.
+  const timestampMs = numeric < 1_000_000_000_000 ? numeric * 1000 : numeric;
+  const parsed = new Date(timestampMs);
+
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error(`Unable to parse measured_at timestamp: ${input}`);
+  }
+
+  return parsed.toISOString();
 };
 
 export const hydrationApi = {
   pushMeasurement: (payload: LoadCellMeasurementPayload) => {
     const weight = Math.round(payload.weight * 100) / 100; // Round to 2 decimal places - toFixed returns a string, so we use Math.round instead
+    const timestamp = toIsoTimestamp(payload.measured_at);
+    console.log(`Pushing measurement for user ${payload.userId}: ${weight}g from source ${payload.source} at ${timestamp}. \nPayload:`, payload);
     return request(`/users/${payload.userId}/water`, {
       method: 'POST',
-      body: { weight }
+      body: {
+        weight, 
+        source: payload.source, 
+        measured_at: timestamp 
+      }
     });
   }
 };

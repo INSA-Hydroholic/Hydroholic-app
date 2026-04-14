@@ -184,7 +184,9 @@ export function useBLE() {
     try {
       await hydrationApi.pushMeasurement({
         userId,
-        weight: packet.weight
+        weight: packet.weight,
+        source: 'hydrobase',
+        measured_at: packet.time
       });
 
       pushLog('Packet d\'hydratation envoye avec succes au backend.');
