@@ -33,6 +33,7 @@ export default function HomeScreen() {
     statusMsg,
     connectToESP32,
     disconnect,
+    tareLoadCell,
     logs,
   } = useBLE();
 
@@ -96,6 +97,15 @@ export default function HomeScreen() {
               </Text>
           }
         </TouchableOpacity>
+
+        {isConnected && (
+          <TouchableOpacity
+            style={[styles.bleButton, styles.bleButtonTare]}
+            onPress={tareLoadCell}
+          >
+            <Text style={styles.bleButtonText}>Tarer la balance</Text>
+          </TouchableOpacity>
+        )}
 
       </View>
 
@@ -170,6 +180,7 @@ const styles = StyleSheet.create({
   },
   bleButtonConnect:    { backgroundColor: '#2196F3' },
   bleButtonDisconnect: { backgroundColor: '#f44336' },
+  bleButtonTare: { backgroundColor: '#2e7d32' },
   bleButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
   logContainer: { paddingHorizontal: 16, paddingVertical: 8 },
   logTitle: { fontSize: 14, fontWeight: '700', marginBottom: 6 },

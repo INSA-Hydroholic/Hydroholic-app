@@ -61,6 +61,25 @@ export function useBLE() {
     return Buffer.from(value, 'utf-8').toString('base64');
   }, []);
 
+  const writeCommand = useCallback(async (message: string, errorPrefix: string): Promise<boolean> => {
+    if (!deviceRef.current) {
+      setStatusMsg('Connectez l\'ESP32 avant d\'envoyer une commande.');
+      return false;
+    }
+
+    try {
+      await deviceRef.current.writeCharacteristicWithResponseForService(
+        SERVICE_UUID,
+        TIME_CHARACTERISTIC_UUID,
+        encodeToBase64(message)
+      );
+      return true;
+    } catch (e: any) {
+      setStatusMsg(errorPrefix + e.message);
+      return false;
+    }
+  }, [encodeToBase64]);
+
   // --- Permisos Android ---
   const requestPermissions = useCallback(async (): Promise<boolean> => {
     if (Platform.OS === 'android') {
@@ -86,42 +105,23 @@ export function useBLE() {
   }, []);
 
   const sendCurrentUnixTimestamp = useCallback(async () => {
-    if (!deviceRef.current) {
-      setStatusMsg('Connectez l\'ESP32 avant d\'envoyer l\'heure.');
-      return;
-    }
-
-    try {
-      const now = Math.floor(Date.now() / 1000).toString();
-      const encodedTimestamp = encodeToBase64(now);
-
-      await deviceRef.current.writeCharacteristicWithResponseForService(
-        SERVICE_UUID,
-        TIME_CHARACTERISTIC_UUID,
-        encodedTimestamp
-      );
-
+    const now = Math.floor(Date.now() / 1000).toString();
+    if (await writeCommand(now, 'Erreur lors de l\'envoi du timestamp: ')) {
       setStatusMsg('Timestamp envoye: ' + now);
-    } catch (e: any) {
-      setStatusMsg('Erreur lors de l\'envoi du timestamp: ' + e.message);
     }
-  }, [encodeToBase64]);
+  }, [writeCommand]);
 
   const sendProtocolResponse = useCallback(async (message: 'OK' | 'ERROR') => {
-    if (!deviceRef.current) {
-      return;
-    }
+    await writeCommand(message, 'Erreur envoi ACK BLE: ');
+  }, [writeCommand]);
 
-    try {
-      await deviceRef.current.writeCharacteristicWithResponseForService(
-        SERVICE_UUID,
-        TIME_CHARACTERISTIC_UUID,
-        encodeToBase64(message)
-      );
-    } catch (e: any) {
-      setStatusMsg('Erreur envoi ACK BLE: ' + e.message);
+  const tareLoadCell = useCallback(async () => {
+    const sent = await writeCommand('TARE', 'Erreur lors de la tare: ');
+    if (sent) {
+      setStatusMsg('Commande tare envoyée à l\'ESP32.');
+      pushLog('Commande BLE envoyée: TARE');
     }
-  }, [encodeToBase64]);
+  }, [pushLog, writeCommand]);
 
   const parseHydrationPacket = useCallback((rawValue: string): HydrationPacket | null => {
     // Packet's expected format: "HIST:timestamp,weight"
@@ -321,6 +321,7 @@ export function useBLE() {
     statusMsg,
     connectToESP32,
     disconnect,
+    tareLoadCell,
     logs,
   };
 }
