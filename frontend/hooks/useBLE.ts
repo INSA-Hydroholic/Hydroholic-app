@@ -17,6 +17,7 @@ export function useBLE() {
   const [isConnected, setIsConnected]   = useState(false);
   const [isScanning, setIsScanning]     = useState(false);
   const [weight, setWeight]             = useState<number | null>(null);
+  const [scaleFactor, setScaleFactor]   = useState<number | null>(null);
   const [statusMsg, setStatusMsg]       = useState('Deconnecte');
   const [logs, setLogs]                 = useState<string[]>([]);
   const deviceRef = useRef<Device | null>(null);
@@ -123,6 +124,29 @@ export function useBLE() {
     }
   }, [pushLog, writeCommand]);
 
+  const requestScaleFactor = useCallback(async () => {
+    const sent = await writeCommand('GET_SCALE', 'Erreur lors de la lecture du facteur: ');
+    if (sent) {
+      setStatusMsg('Lecture du facteur de calibration en cours...');
+      pushLog('Commande BLE envoyee: GET_SCALE');
+    }
+  }, [pushLog, writeCommand]);
+
+  const updateScaleFactor = useCallback(async (nextScaleFactor: number) => {
+    if (!Number.isFinite(nextScaleFactor) || nextScaleFactor <= 0) {
+      setStatusMsg('Facteur de calibration invalide. Utilisez une valeur > 0.');
+      return false;
+    }
+
+    const formatted = nextScaleFactor.toFixed(6);
+    const sent = await writeCommand(`SET_SCALE:${formatted}`, 'Erreur maj facteur calibration: ');
+    if (sent) {
+      setStatusMsg('Mise a jour du facteur de calibration en cours...');
+      pushLog(`Commande BLE envoyee: SET_SCALE:${formatted}`);
+    }
+    return sent;
+  }, [pushLog, writeCommand]);
+
   const parseHydrationPacket = useCallback((rawValue: string): HydrationPacket | null => {
     // Packet's expected format: "HIST:timestamp,weight"
     if (!rawValue.startsWith('HIST:')) {
@@ -177,6 +201,25 @@ export function useBLE() {
 
   const handleIncomingBleMessage = useCallback(async (raw: string) => {
     pushLog(`RX: ${raw}`);
+
+    if (raw.startsWith('SCALE:')) {
+      const valuePart = raw.slice('SCALE:'.length).trim();
+      if (valuePart === 'ERROR') {
+        setStatusMsg('ESP32 a refuse la mise a jour du facteur de calibration.');
+        pushLog('Reponse SCALE:ERROR recue.');
+        return;
+      }
+
+      const parsedScale = Number(valuePart);
+      if (Number.isFinite(parsedScale) && parsedScale > 0) {
+        setScaleFactor(parsedScale);
+        setStatusMsg(`Facteur de calibration courant: ${parsedScale.toFixed(6)}`);
+        pushLog(`Facteur de calibration recu: ${parsedScale.toFixed(6)}`);
+      } else {
+        pushLog(`Payload SCALE invalide ignore: ${raw}`);
+      }
+      return;
+    }
 
     const hydrationPacket = parseHydrationPacket(raw);
     if (hydrationPacket) {
@@ -257,6 +300,7 @@ export function useBLE() {
 
           // TIME_CHAR is write-only on ESP32, so we sync time from app right after connect.
           await sendCurrentUnixTimestamp();
+          await requestScaleFactor();
 
           // Detectar desconexión
           connected.onDisconnected(() => {
@@ -284,7 +328,7 @@ export function useBLE() {
         setStatusMsg('ESP32 introuvable');
       }
     }, 10000);
-  }, [decodeBase64, handleIncomingBleMessage, isConnected, isScanning, manager, requestPermissions, sendCurrentUnixTimestamp, stopActiveScan]);
+  }, [decodeBase64, handleIncomingBleMessage, isConnected, isScanning, manager, requestPermissions, requestScaleFactor, sendCurrentUnixTimestamp, stopActiveScan]);
 
   // --- Desconectar ---
   const disconnect = useCallback(async () => {
@@ -319,9 +363,12 @@ export function useBLE() {
     isScanning,
     weight,
     statusMsg,
+    scaleFactor,
     connectToESP32,
     disconnect,
     tareLoadCell,
+    requestScaleFactor,
+    updateScaleFactor,
     logs,
   };
 }

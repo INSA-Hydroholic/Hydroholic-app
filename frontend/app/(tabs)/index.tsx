@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Text,
+  TextInput,
 } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -30,12 +31,22 @@ export default function HomeScreen() {
     isConnected,
     isScanning,
     weight,
+    scaleFactor,
     statusMsg,
     connectToESP32,
     disconnect,
     tareLoadCell,
+    requestScaleFactor,
+    updateScaleFactor,
     logs,
   } = useBLE();
+  const [scaleInput, setScaleInput] = useState('');
+
+  useEffect(() => {
+    if (scaleFactor !== null) {
+      setScaleInput(scaleFactor.toFixed(6));
+    }
+  }, [scaleFactor]);
 
   // Mock data
   const rankings = [
@@ -63,6 +74,14 @@ export default function HomeScreen() {
   const handleMenuItemPress = (item: string) => {
     // TODO: Navigate to different screens based on menu item
     console.log('Menu item pressed:', item);
+  };
+
+  const handleScaleUpdate = async () => {
+    const parsed = Number(scaleInput.replace(',', '.').trim());
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return;
+    }
+    await updateScaleFactor(parsed);
   };
 
   return (
@@ -99,12 +118,46 @@ export default function HomeScreen() {
         </TouchableOpacity>
 
         {isConnected && (
-          <TouchableOpacity
-            style={[styles.bleButton, styles.bleButtonTare]}
-            onPress={tareLoadCell}
-          >
-            <Text style={styles.bleButtonText}>Tarer la balance</Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              style={[styles.bleButton, styles.bleButtonTare]}
+              onPress={tareLoadCell}
+            >
+              <Text style={styles.bleButtonText}>Tarer la balance</Text>
+            </TouchableOpacity>
+
+            <View style={styles.scaleCard}>
+              <Text style={styles.scaleTitle}>Facteur de calibration</Text>
+              <Text style={styles.scaleCurrentValue}>
+                {scaleFactor !== null ? scaleFactor.toFixed(6) : 'Non charge'}
+              </Text>
+
+              <TextInput
+                value={scaleInput}
+                onChangeText={setScaleInput}
+                keyboardType="decimal-pad"
+                placeholder="Ex: 2280.000000"
+                placeholderTextColor="#8a8a8a"
+                style={styles.scaleInput}
+              />
+
+              <View style={styles.scaleActionsRow}>
+                <TouchableOpacity
+                  style={[styles.scaleActionButton, styles.scaleReadButton]}
+                  onPress={requestScaleFactor}
+                >
+                  <Text style={styles.bleButtonText}>Lire</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.scaleActionButton, styles.scaleUpdateButton]}
+                  onPress={handleScaleUpdate}
+                >
+                  <Text style={styles.bleButtonText}>Mettre a jour</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </>
         )}
 
       </View>
@@ -182,6 +235,40 @@ const styles = StyleSheet.create({
   bleButtonDisconnect: { backgroundColor: '#f44336' },
   bleButtonTare: { backgroundColor: '#2e7d32' },
   bleButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
+  scaleCard: {
+    width: '90%',
+    backgroundColor: '#f3f8ff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#dbe8ff',
+    padding: 12,
+    gap: 8,
+  },
+  scaleTitle: { fontSize: 14, fontWeight: '700', color: '#1f2937' },
+  scaleCurrentValue: { fontSize: 16, fontWeight: '700', color: '#0f4fa8' },
+  scaleInput: {
+    borderWidth: 1,
+    borderColor: '#c8d6f0',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#1f2937',
+    fontSize: 15,
+  },
+  scaleActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  scaleActionButton: {
+    flex: 1,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  scaleReadButton: { backgroundColor: '#0b7fab' },
+  scaleUpdateButton: { backgroundColor: '#6b46c1' },
   logContainer: { paddingHorizontal: 16, paddingVertical: 8 },
   logTitle: { fontSize: 14, fontWeight: '700', marginBottom: 6 },
   logBox: { maxHeight: 120, backgroundColor: '#fafafa', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#eee' },
