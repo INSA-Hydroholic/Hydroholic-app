@@ -8,6 +8,7 @@ interface HeaderProps {
   onNotificationsPress?: () => void;
   onProfilePress?: () => void;
   notificationCount?: number;
+  batteryLevel?: number | null;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -15,9 +16,19 @@ export const Header: React.FC<HeaderProps> = ({
   onNotificationsPress,
   onProfilePress,
   notificationCount = 0,
+  batteryLevel = null,
 }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const safeBattery = batteryLevel !== null ? Math.max(0, Math.min(100, Math.round(batteryLevel))) : null;
+  const batteryTone =
+    safeBattery === null
+      ? '#94a3b8'
+      : safeBattery <= 20
+      ? '#ef4444'
+      : safeBattery <= 45
+      ? '#f59e0b'
+      : '#10b981';
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
@@ -33,6 +44,18 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right: Icons */}
       <View style={styles.rightContainer}>
+
+        <View style={[styles.batteryChip, { borderColor: `${batteryTone}66` }]}>
+          <View style={styles.batteryIconShell}>
+            <View style={styles.batteryIconTop} />
+            <View style={styles.batteryIconInner}>
+              <View style={[styles.batteryIconFill, { width: `${safeBattery ?? 8}%`, backgroundColor: batteryTone }]} />
+            </View>
+          </View>
+          <Text style={[styles.batteryLabel, { color: batteryTone }]}> 
+            {safeBattery !== null ? `${safeBattery}%` : '--'}
+          </Text>
+        </View>
 
         {/* Notifications */}
         <Pressable style={styles.iconButton} onPress={onNotificationsPress}>
@@ -86,7 +109,48 @@ const styles = StyleSheet.create({
   },
   rightContainer: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    gap: 4,
+  },
+  batteryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    backgroundColor: '#eef6ff',
+    gap: 6,
+  },
+  batteryIconShell: {
+    width: 22,
+    alignItems: 'center',
+  },
+  batteryIconTop: {
+    width: 8,
+    height: 2,
+    borderTopLeftRadius: 2,
+    borderTopRightRadius: 2,
+    backgroundColor: '#c9d7ea',
+    marginBottom: 2,
+  },
+  batteryIconInner: {
+    width: 18,
+    height: 9,
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: '#c9d7ea',
+    backgroundColor: '#ffffff',
+    overflow: 'hidden',
+    padding: 1,
+  },
+  batteryIconFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  batteryLabel: {
+    fontSize: 11,
+    fontWeight: '800',
   },
   icon: {
     fontSize: 20,

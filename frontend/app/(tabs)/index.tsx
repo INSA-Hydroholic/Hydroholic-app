@@ -8,6 +8,9 @@ import {
   ActivityIndicator,
   Text,
   TextInput,
+  Platform,
+  ToastAndroid,
+  Alert,
 } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -18,6 +21,7 @@ import { ObjectiveCard } from '@/components/ObjectiveCard';
 import { ChallengeCard } from '@/components/ChallengeCard';
 import { RankingCard } from '@/components/RankingCard';
 import { HistoryCard } from '@/components/HistoryCard';
+import { BatteryCard } from '@/components/BatteryCard';
 import { useBLE } from '@/hooks/useBLE'; 
 import { LoadCellGraph } from '@/components/LoadCellGraph';
 
@@ -35,16 +39,20 @@ export default function HomeScreen() {
     isConnected,
     isScanning,
     weight,
+    batteryLevel,
     scaleFactor,
     statusMsg,
     connectToESP32,
     disconnect,
     tareLoadCell,
+    requestBatteryLevel,
     requestScaleFactor,
     updateScaleFactor,
     logs,
   } = useBLE();
   const [scaleInput, setScaleInput] = useState('');
+  const [isBatteryRefreshing, setIsBatteryRefreshing] = useState(false);
+  const [hasShownLowBatteryWarning, setHasShownLowBatteryWarning] = useState(false);
 
   useEffect(() => {
     if (scaleFactor !== null) {
@@ -75,6 +83,51 @@ export default function HomeScreen() {
       return [...prev, point].slice(-MAX_LOAD_CELL_POINTS);
     });
   }, [weight]);
+
+  useEffect(() => {
+    if (!isConnected) {
+      setIsBatteryRefreshing(false);
+      return;
+    }
+
+    const refreshBattery = async () => {
+      try {
+        setIsBatteryRefreshing(true);
+        await requestBatteryLevel();
+      } finally {
+        setIsBatteryRefreshing(false);
+      }
+    };
+
+    refreshBattery();
+    const intervalId = setInterval(refreshBattery, 60000);
+    return () => clearInterval(intervalId);
+  }, [isConnected, requestBatteryLevel]);
+
+  useEffect(() => {
+    if (!isConnected) {
+      setHasShownLowBatteryWarning(false);
+      return;
+    }
+
+    if (batteryLevel === null) {
+      return;
+    }
+
+    if (batteryLevel <= 20 && !hasShownLowBatteryWarning) {
+      const warningMessage = 'Hydrobase battery is low (<20%). Please recharge soon.';
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(warningMessage, ToastAndroid.LONG);
+      } else {
+        Alert.alert('Low battery', warningMessage);
+      }
+      setHasShownLowBatteryWarning(true);
+    }
+
+    if (batteryLevel > 25 && hasShownLowBatteryWarning) {
+      setHasShownLowBatteryWarning(false);
+    }
+  }, [batteryLevel, hasShownLowBatteryWarning, isConnected]);
 
   // Mock data
   const rankings = [
@@ -112,6 +165,15 @@ export default function HomeScreen() {
     await updateScaleFactor(parsed);
   };
 
+  const handleBatteryRefresh = async () => {
+    try {
+      setIsBatteryRefreshing(true);
+      await requestBatteryLevel();
+    } finally {
+      setIsBatteryRefreshing(false);
+    }
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Header
@@ -119,6 +181,7 @@ export default function HomeScreen() {
         onNotificationsPress={() => console.log('Notifications')}
         onProfilePress={() => console.log('Profile')}
         notificationCount={3}
+        batteryLevel={batteryLevel}
       />
 
       <SideMenu
@@ -190,7 +253,14 @@ export default function HomeScreen() {
 
       </View>
 
-      <LoadCellGraph points={loadCellHistory} />
+      <BatteryCard
+        level={batteryLevel}
+        isConnected={isConnected}
+        onRefresh={handleBatteryRefresh}
+        refreshing={isBatteryRefreshing}
+      />
+
+      {/* <LoadCellGraph points={loadCellHistory} /> */}
 
       <View style={styles.logContainer}>
         <Text style={styles.logTitle}>BLE Log</Text>

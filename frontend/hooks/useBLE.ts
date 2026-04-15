@@ -18,6 +18,7 @@ export function useBLE() {
   const [isScanning, setIsScanning]     = useState(false);
   const [weight, setWeight]             = useState<number | null>(null);
   const [scaleFactor, setScaleFactor]   = useState<number | null>(null);
+  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
   const [statusMsg, setStatusMsg]       = useState('Deconnecte');
   const [logs, setLogs]                 = useState<string[]>([]);
   const deviceRef = useRef<Device | null>(null);
@@ -133,6 +134,14 @@ export function useBLE() {
     }
   }, [pushLog, writeCommand]);
 
+  const requestBatteryLevel = useCallback(async () => {
+    const sent = await writeCommand('GET_BATTERY', 'Erreur lors de la lecture de la batterie: ');
+    if (sent) {
+      setStatusMsg('Lecture du niveau de batterie en cours...');
+      pushLog('Commande BLE envoyee: GET_BATTERY');
+    }
+  }, [pushLog, writeCommand]);
+
   const updateScaleFactor = useCallback(async (nextScaleFactor: number) => {
     if (!Number.isFinite(nextScaleFactor) || nextScaleFactor <= 0) {
       setStatusMsg('Facteur de calibration invalide. Utilisez une valeur > 0.');
@@ -154,7 +163,7 @@ export function useBLE() {
       return null;
     }
 
-    const [timestamp, weight] = rawValue.slice(5).split(',');
+    const [timestamp, weight] = rawValue.slice(5).split(','); // Remove "HIST:" prefix and split by comma
     if (!timestamp || !weight) {
       return null;
     }
@@ -163,7 +172,7 @@ export function useBLE() {
     console.log(`Parsing hydration packet - timestamp: ${timestamp}, weight: ${weight}`);
     const num_weight = Number(weight);
 
-    if (!Number.isFinite(time) || !Number.isFinite(num_weight) || time <= 0 || num_weight <= 0) {
+    if (!Number.isFinite(time) || !Number.isFinite(num_weight) || time <= 0) {
       return null;
     }
 
@@ -206,6 +215,24 @@ export function useBLE() {
 
   const handleIncomingBleMessage = useCallback(async (raw: string) => {
     pushLog(`RX: ${raw}`);
+
+    if (raw.startsWith('BATTERY:')) {
+      const valuePart = raw.slice('BATTERY:'.length).trim();
+      const parsedBattery = Number(valuePart);
+      console.log(`Parsed battery value: ${parsedBattery}`);
+      if (Number.isFinite(parsedBattery)) {
+        const normalizedBattery = parsedBattery > 100
+          ? (parsedBattery / 4095) * 100
+          : parsedBattery;
+        const clampedBattery = Math.max(0, Math.min(100, normalizedBattery));
+        setBatteryLevel(clampedBattery);
+        setStatusMsg(`Niveau batterie hydrobase: ${clampedBattery.toFixed(0)}%`);
+        pushLog(`Niveau batterie recu: ${clampedBattery.toFixed(0)}%`);
+      } else {
+        pushLog(`Payload BATTERY invalide ignore: ${raw}`);
+      }
+      return;
+    }
 
     if (raw.startsWith('SCALE:')) {
       const valuePart = raw.slice('SCALE:'.length).trim();
@@ -339,11 +366,13 @@ export function useBLE() {
           // TIME_CHAR is write-only on ESP32, so we sync time from app right after connect.
           await sendCurrentUnixTimestamp();
           await requestScaleFactor();
+          await requestBatteryLevel();
 
           // Detectar desconexión
           connected.onDisconnected(() => {
             setIsConnected(false);
             setWeight(null);
+            setBatteryLevel(null);
             histBufferRef.current = '';
             deviceRef.current = null;
             monitorSubscriptionRef.current?.remove();
@@ -367,7 +396,7 @@ export function useBLE() {
         setStatusMsg('ESP32 introuvable');
       }
     }, 10000);
-  }, [decodeBase64, handleIncomingBleChunk, isConnected, isScanning, manager, requestPermissions, requestScaleFactor, sendCurrentUnixTimestamp, stopActiveScan]);
+  }, [decodeBase64, handleIncomingBleChunk, isConnected, isScanning, manager, requestBatteryLevel, requestPermissions, requestScaleFactor, sendCurrentUnixTimestamp, stopActiveScan]);
 
   // --- Desconectar ---
   const disconnect = useCallback(async () => {
@@ -380,6 +409,7 @@ export function useBLE() {
       stopActiveScan();
       setIsConnected(false);
       setWeight(null);
+      setBatteryLevel(null);
       setStatusMsg('Deconnecte');
     }
   }, [stopActiveScan]);
@@ -403,11 +433,13 @@ export function useBLE() {
     isConnected,
     isScanning,
     weight,
+    batteryLevel,
     statusMsg,
     scaleFactor,
     connectToESP32,
     disconnect,
     tareLoadCell,
+    requestBatteryLevel,
     requestScaleFactor,
     updateScaleFactor,
     logs,
