@@ -13,6 +13,7 @@ type LoadCellGraphProps = {
 export function LoadCellGraph({ points }: LoadCellGraphProps) {
   const chartHeight = 140;
   const dotSize = 8;
+  const yPaddingGrams = 200;
   const [chartWidth, setChartWidth] = useState(300);
 
   if (points.length === 0) {
@@ -25,9 +26,11 @@ export function LoadCellGraph({ points }: LoadCellGraphProps) {
   }
 
   const values = points.map((point) => point.value);
-  const maxValue = Math.max(...values, 0.1);
+  const maxValue = Math.max(...values, 1);
   const minValue = Math.min(...values);
-  const range = Math.max(maxValue - minValue, 0.01);
+  const paddedMaxValue = maxValue + yPaddingGrams;
+  const paddedMinValue = minValue - yPaddingGrams;
+  const range = Math.max(paddedMaxValue - paddedMinValue, 1);
   const latestValue = points[points.length - 1]?.value ?? 0;
   const labelStep = Math.max(1, Math.ceil(points.length / 8));
 
@@ -37,7 +40,7 @@ export function LoadCellGraph({ points }: LoadCellGraphProps) {
     return points.map((point, index) => {
       const ratioX = points.length === 1 ? 0 : index / (points.length - 1);
       const x = dotSize / 2 + ratioX * (safeWidth - dotSize);
-      const normalizedY = (point.value - minValue) / range;
+      const normalizedY = (point.value - paddedMinValue) / range;
       const y = chartHeight - normalizedY * chartHeight;
 
       return {
@@ -46,7 +49,7 @@ export function LoadCellGraph({ points }: LoadCellGraphProps) {
         y,
       };
     });
-  }, [chartHeight, chartWidth, dotSize, minValue, points, range]);
+  }, [chartHeight, chartWidth, dotSize, paddedMinValue, points, range]);
 
   const handleChartLayout = (event: LayoutChangeEvent) => {
     const nextWidth = Math.round(event.nativeEvent.layout.width);
@@ -60,9 +63,9 @@ export function LoadCellGraph({ points }: LoadCellGraphProps) {
       <Text style={styles.title}>Courbe capteur de charge</Text>
 
       <View style={styles.statsRow}>
-        <Text style={styles.statText}>Actuel: {latestValue.toFixed(2)} L</Text>
-        <Text style={styles.statText}>Min: {minValue.toFixed(2)} L</Text>
-        <Text style={styles.statText}>Max: {maxValue.toFixed(2)} L</Text>
+        <Text style={styles.statText}>Actuel: {Math.round(latestValue)} g</Text>
+        <Text style={styles.statText}>Min: {Math.round(minValue)} g</Text>
+        <Text style={styles.statText}>Max: {Math.round(maxValue)} g</Text>
       </View>
 
       <View style={styles.chartContent}>
@@ -122,7 +125,7 @@ export function LoadCellGraph({ points }: LoadCellGraphProps) {
 
             return (
               <View key={`label-${index}`} style={[styles.labelCell, { left }]}> 
-                <Text style={styles.valueText}>{point.value.toFixed(1)}</Text>
+                <Text style={styles.valueText}>{Math.round(point.value)}g</Text>
                 <Text style={styles.timeText}>{showLabel ? point.label : ' '}</Text>
               </View>
             );

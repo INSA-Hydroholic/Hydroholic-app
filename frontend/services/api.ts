@@ -54,7 +54,9 @@ export const usersApi = {
   getAll: () => request('/users'),
   getById: (userId: string) => request(`/users/${userId}`),
   getRecommendations: (userId: string) => request(`/users/${userId}/recommendations`),
-  ranking: () => request('/users/ranking')
+  ranking: () => request('/users/ranking'),
+  getConsumption: (userId: string, startDate: string, endDate: string) =>
+    request(`/users/${userId}/consumption?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`)
 };
 
 type LoadCellMeasurementPayload = {

@@ -20,16 +20,21 @@ import { RankingCard } from '@/components/RankingCard';
 import { HistoryCard } from '@/components/HistoryCard';
 import { useBLE } from '@/hooks/useBLE'; 
 import { LoadCellGraph } from '@/components/LoadCellGraph';
+import { useAuth } from '@/context/AuthContext';
+import { usersApi } from '@/services/api';
 
 const MAX_LOAD_CELL_POINTS = 1000;
+const CONSUMPTION_REFRESH_MS = 10_000;
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { user } = useAuth();
 
   const [menuVisible, setMenuVisible] = useState(false);
   const [hydrationAmount, setHydrationAmount] = useState(1.8);
   const [hydrationGoal] = useState(3.2);
+  const [totalWaterDrank, setTotalWaterDrank] = useState(0);
   const [loadCellHistory, setLoadCellHistory] = useState<Array<{ value: number; label: string }>>([]);
   const {
     isConnected,
@@ -57,14 +62,16 @@ export default function HomeScreen() {
       return;
     }
 
+    const roundedWeight = Math.round(weight);
+
     setLoadCellHistory((prev) => {
-      const hasSameValue = prev.length > 0 && Math.abs(prev[prev.length - 1].value - weight) < 0.0001;
+      const hasSameValue = prev.length > 0 && prev[prev.length - 1].value === roundedWeight;
       if (hasSameValue) {
         return prev;
       }
 
       const point = {
-        value: weight,
+        value: roundedWeight,
         label: new Date().toLocaleTimeString([], {
           hour: '2-digit',
           minute: '2-digit',
@@ -75,6 +82,39 @@ export default function HomeScreen() {
       return [...prev, point].slice(-MAX_LOAD_CELL_POINTS);
     });
   }, [weight]);
+
+  useEffect(() => {
+    const fetchConsumption = async () => {
+      const userId = user?.id;
+      if (userId === undefined || userId === null) {
+        return;
+      }
+
+      const now = new Date();
+      const startOfDay = new Date(now);
+      startOfDay.setHours(0, 0, 0, 0);
+
+      try {
+        const response = await usersApi.getConsumption(String(userId), startOfDay.toISOString(), now.toISOString());
+        const totalVolume = Number(response?.totalVolume);
+        if (Number.isFinite(totalVolume)) {
+          setTotalWaterDrank(Math.abs(totalVolume) / 1000);
+        }
+      } catch (error) {
+        console.log('Error fetching water consumption:', error);
+      }
+    };
+
+    fetchConsumption();
+
+    const intervalId = setInterval(() => {
+      void fetchConsumption();
+    }, CONSUMPTION_REFRESH_MS);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [user?.id]);
 
   // Mock data
   const rankings = [
@@ -112,6 +152,13 @@ export default function HomeScreen() {
     await updateScaleFactor(parsed);
   };
 
+  const formatWaterAmount = (amount: number) => {
+    if (amount >= 1) {
+      return `${amount.toFixed(2)} L`;
+    }
+    return `${Math.round(amount * 1000)} mL`;
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Header
@@ -129,9 +176,7 @@ export default function HomeScreen() {
 
       <View style={styles.bleContainer}>
         <Text style={styles.bleStatus}>{statusMsg}</Text>
-        {weight !== null && (
-          <Text style={styles.bleWeight}>💧 {weight.toFixed(2)} L</Text>
-        )}
+        <Text style={styles.bleWeight}>💧 {formatWaterAmount(totalWaterDrank)}</Text>
         <TouchableOpacity
           style={[styles.bleButton, isConnected ? styles.bleButtonDisconnect : styles.bleButtonConnect]}
           onPress={isConnected ? disconnect : connectToESP32}

@@ -194,7 +194,7 @@ export function useBLE() {
 
       pushLog('Packet d\'hydratation envoye avec succes au backend.');
       setStatusMsg('Donnee hydratation envoyee au backend (' + packet.weight + ' g)');
-      setWeight(packet.weight / 1000);
+      setWeight(packet.weight);
       await sendProtocolResponse('OK');
       return true;
     } catch (e: any) {
