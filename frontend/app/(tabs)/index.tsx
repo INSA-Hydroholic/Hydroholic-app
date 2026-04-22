@@ -30,6 +30,7 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { user } = useAuth();
+  const [now, setNow] = useState(() => Date.now());
 
   const [menuVisible, setMenuVisible] = useState(false);
   const [hydrationAmount, setHydrationAmount] = useState(1.8);
@@ -42,6 +43,7 @@ export default function HomeScreen() {
     weight,
     scaleFactor,
     statusMsg,
+    statusUpdatedAt,
     connectToESP32,
     disconnect,
     tareLoadCell,
@@ -56,6 +58,16 @@ export default function HomeScreen() {
       setScaleInput(scaleFactor.toFixed(6));
     }
   }, [scaleFactor]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);
 
   useEffect(() => {
     if (weight === null || !Number.isFinite(weight)) {
@@ -159,6 +171,9 @@ export default function HomeScreen() {
     return `${Math.round(amount * 1000)} mL`;
   };
 
+  const statusAgeSeconds = Math.max(0, Math.floor((now - statusUpdatedAt) / 1000));
+  const statusLabel = `${statusMsg} (${statusAgeSeconds}s ago)`;
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Header
@@ -175,7 +190,7 @@ export default function HomeScreen() {
       />
 
       <View style={styles.bleContainer}>
-        <Text style={styles.bleStatus}>{statusMsg}</Text>
+        <Text style={styles.bleStatus}>{statusLabel}</Text>
         <Text style={styles.bleWeight}>💧 {formatWaterAmount(totalWaterDrank)}</Text>
         <TouchableOpacity
           style={[styles.bleButton, isConnected ? styles.bleButtonDisconnect : styles.bleButtonConnect]}
@@ -236,7 +251,8 @@ export default function HomeScreen() {
       </View>
 
       <LoadCellGraph points={loadCellHistory} />
-
+      
+      {/* 
       <View style={styles.logContainer}>
         <Text style={styles.logTitle}>BLE Log</Text>
         <ScrollView style={styles.logBox}>
@@ -249,6 +265,7 @@ export default function HomeScreen() {
           )}
         </ScrollView>
       </View>
+      */}
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Hydration Card */}

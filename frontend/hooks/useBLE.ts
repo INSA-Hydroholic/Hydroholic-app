@@ -19,6 +19,7 @@ export function useBLE() {
   const [weight, setWeight]             = useState<number | null>(null);
   const [scaleFactor, setScaleFactor]   = useState<number | null>(null);
   const [statusMsg, setStatusMsg]       = useState('Deconnecte');
+  const [statusUpdatedAt, setStatusUpdatedAt] = useState<number>(() => Date.now());
   const [logs, setLogs]                 = useState<string[]>([]);
   const deviceRef = useRef<Device | null>(null);
   const monitorSubscriptionRef = useRef<{ remove: () => void } | null>(null);
@@ -29,6 +30,11 @@ export function useBLE() {
     weight: number;
     time: number;
   };
+
+  const updateStatusMsg = useCallback((message: string) => {
+    setStatusMsg(message);
+    setStatusUpdatedAt(Date.now());
+  }, []);
 
   if (!managerRef.current) {
     managerRef.current = new BleManager();
@@ -65,7 +71,7 @@ export function useBLE() {
 
   const writeCommand = useCallback(async (message: string, errorPrefix: string): Promise<boolean> => {
     if (!deviceRef.current) {
-      setStatusMsg('Connectez l\'ESP32 avant d\'envoyer une commande.');
+      updateStatusMsg('Connectez l\'ESP32 avant d\'envoyer une commande.');
       return false;
     }
 
@@ -77,10 +83,10 @@ export function useBLE() {
       );
       return true;
     } catch (e: any) {
-      setStatusMsg(errorPrefix + e.message);
+      updateStatusMsg(errorPrefix + e.message);
       return false;
     }
-  }, [encodeToBase64]);
+  }, [encodeToBase64, updateStatusMsg]);
 
   // --- Permisos Android ---
   const requestPermissions = useCallback(async (): Promise<boolean> => {
@@ -109,9 +115,9 @@ export function useBLE() {
   const sendCurrentUnixTimestamp = useCallback(async () => {
     const now = Math.floor(Date.now() / 1000).toString();
     if (await writeCommand(now, 'Erreur lors de l\'envoi du timestamp: ')) {
-      setStatusMsg('Timestamp envoye: ' + now);
+      updateStatusMsg('Timestamp envoye: ' + now);
     }
-  }, [writeCommand]);
+  }, [updateStatusMsg, writeCommand]);
 
   const sendProtocolResponse = useCallback(async (message: 'OK' | 'ERROR') => {
     await writeCommand(message, 'Erreur envoi ACK BLE: ');
@@ -120,33 +126,33 @@ export function useBLE() {
   const tareLoadCell = useCallback(async () => {
     const sent = await writeCommand('TARE', 'Erreur lors de la tare: ');
     if (sent) {
-      setStatusMsg('Commande tare envoyée à l\'ESP32.');
+      updateStatusMsg('Commande tare envoyée à l\'ESP32.');
       pushLog('Commande BLE envoyée: TARE');
     }
-  }, [pushLog, writeCommand]);
+  }, [pushLog, updateStatusMsg, writeCommand]);
 
   const requestScaleFactor = useCallback(async () => {
     const sent = await writeCommand('GET_SCALE', 'Erreur lors de la lecture du facteur: ');
     if (sent) {
-      setStatusMsg('Lecture du facteur de calibration en cours...');
+      updateStatusMsg('Lecture du facteur de calibration en cours...');
       pushLog('Commande BLE envoyee: GET_SCALE');
     }
-  }, [pushLog, writeCommand]);
+  }, [pushLog, updateStatusMsg, writeCommand]);
 
   const updateScaleFactor = useCallback(async (nextScaleFactor: number) => {
     if (!Number.isFinite(nextScaleFactor) || nextScaleFactor <= 0) {
-      setStatusMsg('Facteur de calibration invalide. Utilisez une valeur > 0.');
+      updateStatusMsg('Facteur de calibration invalide. Utilisez une valeur > 0.');
       return false;
     }
 
     const formatted = nextScaleFactor.toFixed(6);
     const sent = await writeCommand(`SET_SCALE:${formatted}`, 'Erreur maj facteur calibration: ');
     if (sent) {
-      setStatusMsg('Mise a jour du facteur de calibration en cours...');
+      updateStatusMsg('Mise a jour du facteur de calibration en cours...');
       pushLog(`Commande BLE envoyee: SET_SCALE:${formatted}`);
     }
     return sent;
-  }, [pushLog, writeCommand]);
+  }, [pushLog, updateStatusMsg, writeCommand]);
 
   const parseHydrationPacket = useCallback((rawValue: string): HydrationPacket | null => {
     // Packet's expected format: "HIST:timestamp,weight"
@@ -178,7 +184,7 @@ export function useBLE() {
     const userId = String(user?.id ?? '');
 
     if (!userId) {
-      setStatusMsg('Utilisateur non connecte: impossible d\'envoyer l\'hydratation.');
+      updateStatusMsg('Utilisateur non connecte: impossible d\'envoyer l\'hydratation.');
       await sendProtocolResponse('ERROR');
       return false;
     }
@@ -193,16 +199,16 @@ export function useBLE() {
       });
 
       pushLog('Packet d\'hydratation envoye avec succes au backend.');
-      setStatusMsg('Donnee hydratation envoyee au backend (' + packet.weight + ' g)');
+      updateStatusMsg('Donnee hydratation envoyee au backend (' + packet.weight + ' g)');
       setWeight(packet.weight);
       await sendProtocolResponse('OK');
       return true;
     } catch (e: any) {
-      setStatusMsg('Erreur backend hydratation: ' + e.message);
+      updateStatusMsg('Erreur backend hydratation: ' + e.message);
       await sendProtocolResponse('ERROR');
       return false;
     }
-  }, [sendProtocolResponse, user?.id]);
+  }, [sendProtocolResponse, updateStatusMsg, user?.id]);
 
   const handleIncomingBleMessage = useCallback(async (raw: string) => {
     pushLog(`RX: ${raw}`);
@@ -210,7 +216,7 @@ export function useBLE() {
     if (raw.startsWith('SCALE:')) {
       const valuePart = raw.slice('SCALE:'.length).trim();
       if (valuePart === 'ERROR') {
-        setStatusMsg('ESP32 a refuse la mise a jour du facteur de calibration.');
+        updateStatusMsg('ESP32 a refuse la mise a jour du facteur de calibration.');
         pushLog('Reponse SCALE:ERROR recue.');
         return;
       }
@@ -218,7 +224,7 @@ export function useBLE() {
       const parsedScale = Number(valuePart);
       if (Number.isFinite(parsedScale) && parsedScale > 0) {
         setScaleFactor(parsedScale);
-        setStatusMsg(`Facteur de calibration courant: ${parsedScale.toFixed(6)}`);
+        updateStatusMsg(`Facteur de calibration courant: ${parsedScale.toFixed(6)}`);
         pushLog(`Facteur de calibration recu: ${parsedScale.toFixed(6)}`);
       } else {
         pushLog(`Payload SCALE invalide ignore: ${raw}`);
@@ -277,7 +283,7 @@ export function useBLE() {
 
     const btState = await manager.state();
     if (btState !== 'PoweredOn') {
-      setStatusMsg('Bluetooth desactive. Active-le pour continuer.');
+      updateStatusMsg('Bluetooth desactive. Active-le pour continuer.');
       return;
     }
 
@@ -288,14 +294,14 @@ export function useBLE() {
     }
 
     setIsScanning(true);
-    setStatusMsg('Recherche de l\'ESP32...');
+    updateStatusMsg('Recherche de l\'ESP32...');
 
     monitorSubscriptionRef.current?.remove();
     monitorSubscriptionRef.current = null;
 
     manager.startDeviceScan(null, null, async (error, device) => {
       if (error) {
-        setStatusMsg('Erreur de scan: ' + error.message);
+        updateStatusMsg('Erreur de scan: ' + error.message);
         stopActiveScan();
         return;
       }
@@ -303,7 +309,7 @@ export function useBLE() {
       // Busca por nombre o por SERVICE_UUID
       if (device && (device.name === 'ESP32_Weight' || device.serviceUUIDs?.includes(SERVICE_UUID))) {
         stopActiveScan();
-        setStatusMsg('ESP32 trouvee, connexion...');
+        updateStatusMsg('ESP32 trouvee, connexion...');
 
         try {
           const connected = await device.connect();
@@ -318,7 +324,7 @@ export function useBLE() {
           histBufferRef.current = '';
           deviceRef.current = connected;
           setIsConnected(true);
-          setStatusMsg('Connecte a ' + (connected.name ?? 'ESP32'));
+          updateStatusMsg('Connecte a ' + (connected.name ?? 'ESP32'));
 
           // Suscribirse a las notificaciones (NOTIFY)
           monitorSubscriptionRef.current = connected.monitorCharacteristicForService(
@@ -326,7 +332,7 @@ export function useBLE() {
             CHARACTERISTIC_UUID,
             async (err, characteristic) => {
               if (err) {
-                setStatusMsg('Erreur de notification: ' + err.message);
+                updateStatusMsg('Erreur de notification: ' + err.message);
                 return;
               }
               if (characteristic?.value) {
@@ -349,11 +355,11 @@ export function useBLE() {
             monitorSubscriptionRef.current?.remove();
             monitorSubscriptionRef.current = null;
             stopActiveScan();
-            setStatusMsg('Deconnecte');
+            updateStatusMsg('Deconnecte');
           });
 
         } catch (e: any) {
-          setStatusMsg('Erreur de connexion: ' + e.message);
+          updateStatusMsg('Erreur de connexion: ' + e.message);
           setIsConnected(false);
           deviceRef.current = null;
         }
@@ -364,10 +370,10 @@ export function useBLE() {
     scanTimeoutRef.current = setTimeout(() => {
       if (!deviceRef.current) {
         stopActiveScan();
-        setStatusMsg('ESP32 introuvable');
+        updateStatusMsg('ESP32 introuvable');
       }
     }, 10000);
-  }, [decodeBase64, handleIncomingBleChunk, isConnected, isScanning, manager, requestPermissions, requestScaleFactor, sendCurrentUnixTimestamp, stopActiveScan]);
+  }, [decodeBase64, handleIncomingBleChunk, isConnected, isScanning, manager, requestPermissions, requestScaleFactor, sendCurrentUnixTimestamp, stopActiveScan, updateStatusMsg]);
 
   // --- Desconectar ---
   const disconnect = useCallback(async () => {
@@ -380,9 +386,9 @@ export function useBLE() {
       stopActiveScan();
       setIsConnected(false);
       setWeight(null);
-      setStatusMsg('Deconnecte');
+      updateStatusMsg('Deconnecte');
     }
-  }, [stopActiveScan]);
+  }, [stopActiveScan, updateStatusMsg]);
 
   useEffect(() => {
     return () => {
@@ -411,5 +417,6 @@ export function useBLE() {
     requestScaleFactor,
     updateScaleFactor,
     logs,
+    statusUpdatedAt,
   };
 }
