@@ -6,6 +6,7 @@ import {
   ScrollView,
   SafeAreaView,
   Pressable,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors, Palette } from '@/constants/theme';
@@ -14,12 +15,16 @@ import { Header } from '@/components/Header';
 import { SideMenu } from '@/components/SideMenu';
 import { InputField } from '@/components/InputField';
 import { Button } from '@/components/Button';
+import { challengesApi } from '@/services/api';
+import { useAuth } from '@/context/AuthContext';
 
 export default function CreateChallengeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
+  const { user } = useAuth();
   const [menuVisible, setMenuVisible] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -42,9 +47,50 @@ export default function CreateChallengeScreen() {
     { id: 'custom', label: 'Personnalisé' },
   ];
 
-  const handleCreateChallenge = () => {
-    // TODO: Faire un appel API pour créer le défi
-    router.back();
+  const mapTypeToApi = (type: string) => {
+    if (type === 'solo') return 'daily';
+    if (type === 'amis') return 'team';
+    return 'team';
+  };
+
+  const handleCreateChallenge = async () => {
+    const userId = String(user?.id ?? '');
+    const trimmedName = formData.name.trim();
+    const parsedObjective = Number(formData.objective.replace(',', '.').trim());
+
+    if (!userId) {
+      Alert.alert('Connexion requise', 'Tu dois etre connecte pour creer un defi.');
+      return;
+    }
+
+    if (!trimmedName) {
+      Alert.alert('Validation', 'Le nom du defi est requis.');
+      return;
+    }
+
+    if (!Number.isFinite(parsedObjective) || parsedObjective <= 0) {
+      Alert.alert('Validation', "L'objectif doit etre un nombre superieur a 0.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      await challengesApi.create({
+        name: trimmedName,
+        type: mapTypeToApi(formData.type),
+        objective: parsedObjective,
+        duration: formData.duration,
+        creatorId: userId,
+      });
+
+      Alert.alert('Succes', 'Defi cree avec succes.');
+      router.back();
+    } catch (error: any) {
+      Alert.alert('Erreur', error?.message || 'Impossible de creer le defi.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const toggleFriend = (friend: string) => {
@@ -255,10 +301,11 @@ export default function CreateChallengeScreen() {
 
         {/* Create Button */}
         <Button
-          title="Créer le défi"
-          onPress={handleCreateChallenge}
+          title={isSubmitting ? 'Creation...' : 'Creer le defi'}
+          onPress={() => void handleCreateChallenge()}
           size="large"
           style={styles.createButton}
+          disabled={isSubmitting}
         />
 
         {/* Cancel Button */}
@@ -268,6 +315,7 @@ export default function CreateChallengeScreen() {
           variant="outline"
           size="large"
           style={styles.cancelButton}
+          disabled={isSubmitting}
         />
       </ScrollView>
     </SafeAreaView>
