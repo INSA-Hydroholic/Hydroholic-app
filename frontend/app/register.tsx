@@ -37,7 +37,7 @@ export default function RegisterScreen() {
     sexe: '',               // "H" ou "F"
     activiteIntense: '',    // minutes/semaine
     activiteModeree: '',    // minutes/semaine
-    temperatureLieu: '',    // "<20" ou ">20"
+    ville : '', 
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -235,15 +235,16 @@ export default function RegisterScreen() {
             <Picker.Item label="Femme" value="F" />
           </Picker>
 
-          <Text style={styles.label}>Température de votre lieu de vie (facultatif)</Text>
-          <Picker
-            selectedValue={formData.temperatureLieu}
-            onValueChange={(itemValue: any) => 
-              setFormData({ ...formData, temperatureLieu: itemValue })}>
-            <Picker.Item label="Sélectionner..." value="" />
-            <Picker.Item label="Moins de 20°C" value="<20" />
-            <Picker.Item label="Plus de 20°C" value=">20" />
-          </Picker>
+          <InputField
+            label="Ville (facultatif)"
+            placeholder="Paris"
+            value={formData.ville}
+            onChangeText={(text) => {
+              setFormData({ ...formData, ville: text });
+            }}
+            optional
+          />
+          
 
           <Button
             title={isLoading ? "Inscription..." : "S'inscrire"}
