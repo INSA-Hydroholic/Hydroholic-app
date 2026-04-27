@@ -228,7 +228,7 @@ export default function RegisterScreen() {
           <Text style={styles.label}>Sexe (facultatif)</Text>
           <Picker
             selectedValue={formData.sexe}
-            onValueChange={(itemValue) => 
+            onValueChange={(itemValue: any) => 
               setFormData({ ...formData, sexe: itemValue })}>
             <Picker.Item label="Sélectionner..." value="" />
             <Picker.Item label="Homme" value="H" />
@@ -238,7 +238,7 @@ export default function RegisterScreen() {
           <Text style={styles.label}>Température de votre lieu de vie (facultatif)</Text>
           <Picker
             selectedValue={formData.temperatureLieu}
-            onValueChange={(itemValue) => 
+            onValueChange={(itemValue: any) => 
               setFormData({ ...formData, temperatureLieu: itemValue })}>
             <Picker.Item label="Sélectionner..." value="" />
             <Picker.Item label="Moins de 20°C" value="<20" />
