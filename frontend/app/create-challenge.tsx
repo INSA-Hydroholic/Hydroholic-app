@@ -77,11 +77,10 @@ export default function CreateChallengeScreen() {
       setIsSubmitting(true);
 
       await challengesApi.create({
-        name: trimmedName,
+        name: trimmedName,           // backend lee req.body.name → title
         type: mapTypeToApi(formData.type),
-        objective: parsedObjective,
-        duration: formData.duration,
-        creatorId: userId,
+        objective: parsedObjective,  // backend lee req.body.objective → objective_ml
+        description: '',
       });
 
       Alert.alert('Succes', 'Defi cree avec succes.');

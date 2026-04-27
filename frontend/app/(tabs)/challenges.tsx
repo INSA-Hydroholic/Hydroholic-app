@@ -18,14 +18,24 @@ import { challengesApi } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 
 type ApiChallenge = {
-  id: string;
-  name: string;
-  type: string;
-  duration: string;
-  objective: number;
-  creatorId?: string;
-  participants?: Array<string | number>;
-  progressByUser?: Record<string, number>;
+  id: number;
+  creator_id: number;
+  title: string;
+  description: string | null;
+  start_date: string;
+  end_date: string;
+  status: string;
+  challenge_type: string;
+  objective_ml: number;
+  created_at: string;
+  participants?: Array<{
+    id: number;
+    challengeID: number;  // ← así viene del backend
+    userID: number;        // ← así viene del backend
+    joined_date: string;
+    progress_ml: number;
+    status: string;
+  }>;
 };
 
 const toChallengeArray = (payload: any): ApiChallenge[] => {
@@ -45,7 +55,7 @@ export default function ChallengesScreen() {
   const [allChallenges, setAllChallenges] = useState<ApiChallenge[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [joiningId, setJoiningId] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
 
   const userId = String(user?.id ?? '');
@@ -74,9 +84,10 @@ export default function ChallengesScreen() {
   }, [loadChallenges]);
 
   const isUserInChallenge = useCallback((challenge: ApiChallenge) => {
-    if (!userId) return false;
-    const participants = challenge.participants ?? [];
-    return participants.map(String).includes(userId);
+  if (!userId) return false;
+  return (challenge.participants ?? []).some(
+    (p) => String(p.userID) === userId  // ← userID
+    );
   }, [userId]);
 
   const ongoingChallenges = useMemo(() => {
@@ -88,22 +99,24 @@ export default function ChallengesScreen() {
   }, [allChallenges, isUserInChallenge]);
 
   const getUserProgressPercent = useCallback((challenge: ApiChallenge) => {
-    if (!userId) return 0;
+  if (!userId) return 0;
+  const objective = Number(challenge.objective_ml || 0);
+  const participant = challenge.participants?.find(
+    (p) => String(p.userID) === userId  // ← userID
+  );
+  const progress = Number(participant?.progress_ml ?? 0);
 
-    const objective = Number(challenge.objective || 0);
-    const progress = Number(challenge.progressByUser?.[userId] ?? 0);
+  if (!Number.isFinite(objective) || objective <= 0) return 0;
+  if (!Number.isFinite(progress) || progress <= 0) return 0;
 
-    if (!Number.isFinite(objective) || objective <= 0) return 0;
-    if (!Number.isFinite(progress) || progress <= 0) return 0;
-
-    return Math.max(0, Math.min(100, Math.round((progress / objective) * 100)));
-  }, [userId]);
+  return Math.max(0, Math.min(100, Math.round((progress / objective) * 100)));
+}, [userId]);
 
   const getParticipantsCount = useCallback((challenge: ApiChallenge) => {
     return Array.isArray(challenge.participants) ? challenge.participants.length : 0;
   }, []);
 
-  const handleJoinChallenge = useCallback(async (challengeId: string) => {
+  const handleJoinChallenge = useCallback(async (challengeId: number) => {
     if (!userId) {
       Alert.alert('Connexion requise', 'Tu dois etre connecte pour rejoindre un defi.');
       return;
@@ -181,27 +194,34 @@ export default function ChallengesScreen() {
                         { backgroundColor: colors.background, borderColor: colors.border },
                       ]}>
                       <View style={styles.cardHeader}>
-                        <Text style={[styles.cardTitle, { color: colors.text }]}>{challenge.name}</Text>
+                        <Text style={[styles.cardTitle, { color: colors.text }]}>{challenge.title}</Text>
                         <Text style={[styles.cardBadge, { color: Palette.secondary }]}>EN COURS</Text>
                       </View>
 
                       <View style={styles.cardInfo}>
                         <View style={styles.infoItem}>
                           <Text style={[styles.infoLabel, { color: colors.icon }]}>Type</Text>
-                          <Text style={[styles.infoValue, { color: colors.text }]}>{challenge.type}</Text>
+                          <Text style={[styles.infoValue, { color: colors.text }]}>{challenge.challenge_type}</Text>
                         </View>
 
                         <View style={styles.infoItem}>
                           <Text style={[styles.infoLabel, { color: colors.icon }]}>Duree</Text>
                           <Text style={[styles.infoValue, { color: colors.text }]}>
-                            {challenge.duration}
+                            {Math.ceil(
+                              (new Date(challenge.end_date).getTime() - new Date(challenge.start_date).getTime())
+                              / (1000 * 60 * 60 * 24)
+                            )} jours
                           </Text>
                         </View>
+
+                        <Text style={[styles.infoValue, { color: colors.text }]}>
+                          {challenge.objective_ml} ml
+                        </Text>
 
                         <View style={styles.infoItem}>
                           <Text style={[styles.infoLabel, { color: colors.icon }]}>Objectif</Text>
                           <Text style={[styles.infoValue, { color: colors.text }]}>
-                            {challenge.objective}
+                            {challenge.objective_ml} ml
                           </Text>
                         </View>
                       </View>
@@ -240,13 +260,13 @@ export default function ChallengesScreen() {
                       { backgroundColor: colors.background, borderColor: colors.border },
                     ]}>
                     <View style={styles.cardHeader}>
-                      <Text style={[styles.cardTitle, { color: colors.text }]}>{challenge.name}</Text>
+                      <Text style={[styles.cardTitle, { color: colors.text }]}>{challenge.title}</Text>
                     </View>
 
                     <View style={styles.cardInfo}>
                       <View style={styles.infoItem}>
                         <Text style={[styles.infoLabel, { color: colors.icon }]}>Type</Text>
-                        <Text style={[styles.infoValue, { color: colors.text }]}>{challenge.type}</Text>
+                        <Text style={[styles.infoValue, { color: colors.text }]}>{challenge.challenge_type}</Text>
                       </View>
 
                       <View style={styles.infoItem}>
@@ -257,9 +277,14 @@ export default function ChallengesScreen() {
                       </View>
                     </View>
 
+                    {isUserInChallenge(challenge) ? (
+                    <View style={[styles.alreadyJoinedBadge]}>
+                      <Text style={styles.alreadyJoinedText}>✓ Déjà rejoint</Text>
+                    </View>
+                  ) : (
                     <View style={styles.actionsContainer}>
                       <Button
-                        title={joiningId === challenge.id ? 'Rejoindre...' : 'Rejoindre'}
+                        title={joiningId === challenge.id ? 'En cours...' : 'Rejoindre'}
                         onPress={() => void handleJoinChallenge(challenge.id)}
                         size="small"
                         variant="primary"
@@ -274,6 +299,7 @@ export default function ChallengesScreen() {
                         style={{ flex: 1, marginLeft: 8 }}
                       />
                     </View>
+                  )}
                   </View>
                 ))
               )}
@@ -288,6 +314,21 @@ export default function ChallengesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+    alreadyJoinedBadge: {
+    marginTop: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: Palette.secondary + '20',
+    borderWidth: 1,
+    borderColor: Palette.secondary,
+    alignItems: 'center',
+  },
+  alreadyJoinedText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Palette.secondary,
   },
   scrollContent: {
     flexGrow: 1,
