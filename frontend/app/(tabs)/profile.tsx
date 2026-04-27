@@ -1,13 +1,7 @@
-import React, { useState } from 'react';
-import { Alert } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View,
-  StyleSheet,
-  ScrollView,
-  SafeAreaView,
-  Text,
-  Pressable,
-  Image,
+  View, StyleSheet, ScrollView, SafeAreaView,
+  Text, Pressable, ActivityIndicator, Dimensions,
 } from 'react-native';
 import { Colors, Palette } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -15,244 +9,224 @@ import { Header } from '@/components/Header';
 import { SideMenu } from '@/components/SideMenu';
 import { Button } from '@/components/Button';
 import { useAuth } from '@/context/AuthContext';
+import { profileApi } from '@/services/api';
+
+const { width } = Dimensions.get('window');
+const BAR_MAX_HEIGHT = 80;
+
+type HydrationLog = {
+  id: number;
+  userID: number;
+  weight: number;
+  measured_at: string;
+  source: string;
+};
+
+type DailyConsumption = { day: string; total: number };
+
+const getLast7Days = (): { startDate: string; endDate: string; labels: string[] } => {
+  const now = new Date();
+  const end = new Date(now);
+  end.setHours(23, 59, 59, 999);
+  const start = new Date(now);
+  start.setDate(start.getDate() - 6);
+  start.setHours(0, 0, 0, 0);
+
+  const labels: string[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    labels.push(d.toLocaleDateString('fr-FR', { weekday: 'short' }));
+  }
+
+  return {
+    startDate: start.toISOString(),
+    endDate: end.toISOString(),
+    labels,
+  };
+};
+
+const groupByDay = (logs: HydrationLog[]): DailyConsumption[] => {
+  const map: Record<string, number> = {};
+  const { labels } = getLast7Days();
+
+  // Init all days to 0
+  const now = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const key = d.toLocaleDateString('fr-FR', { weekday: 'short' });
+    map[key] = 0;
+  }
+
+  logs.forEach((log) => {
+    const d = new Date(log.measured_at);
+    const key = d.toLocaleDateString('fr-FR', { weekday: 'short' });
+    if (key in map) {
+      map[key] = (map[key] || 0) + log.weight;
+    }
+  });
+
+  return labels.map((day) => ({ day, total: Math.round((map[day] || 0) / 10) / 100 })); // g → L
+};
 
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const [menuVisible, setMenuVisible] = useState(false);
-  const [editMode, setEditMode] = useState(false);
   const { logout, user } = useAuth();
 
-  // Mock user data
-  const userProfile = {
-    name: 'Jean Dupont',
-    username: '@jeandupont',
-    email: 'jean@example.com',
-    age: 28,
-    gender: 'Homme',
-    region: 'Rhône-Alpes',
-    weight: '72 kg',
-    sport: '3 séances/semaine (intensive)',
-    bio: 'Passionné de fitness et de bonne santé 💪',
-    dailyGoal: '2.8L',
-    friends: 12,
-    challenges: 3,
-    joinDate: 'Janvier 2024',
-  };
+  const [profileData, setProfileData] = useState<any>(null);
+  const [weeklyData, setWeeklyData] = useState<DailyConsumption[]>([]);
+  const [totalWeek, setTotalWeek] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const userId = String(user?.id ?? '');
+
+  const load = useCallback(async () => {
+    if (!userId) return;
+    setIsLoading(true);
+    try {
+      const [profile, history] = await Promise.all([
+        profileApi.getById(userId),
+        profileApi.getWaterHistory(userId),
+      ]);
+      setProfileData(profile);
+
+      const daily = groupByDay(history as HydrationLog[]);
+      setWeeklyData(daily);
+      setTotalWeek(daily.reduce((acc, d) => acc + d.total, 0));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const maxBar = Math.max(...weeklyData.map((d) => d.total), 0.1);
+  const dailyGoalL = (profileData?.daily_goal ?? 2000) / 1000;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Header
         onMenuPress={() => setMenuVisible(true)}
-        onNotificationsPress={() => console.log('Notifications')}
-        onProfilePress={() => console.log('Profile')}
-        
+        onNotificationsPress={() => {}}
+        onProfilePress={() => {}}
       />
-
-      <SideMenu
-        visible={menuVisible}
-        onClose={() => setMenuVisible(false)}
-        onItemPress={() => {}}
-      />
+      <SideMenu visible={menuVisible} onClose={() => setMenuVisible(false)} onItemPress={() => {}} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+
         {/* Profile Header */}
-        <View
-          style={[
-            styles.profileHeader,
-            { backgroundColor: colors.background, borderColor: colors.border },
-          ]}>
-          <View
-            style={[
-              styles.profilePhoto,
-              {
-                backgroundColor: Palette.secondary,
-                borderColor: Palette.primary,
-              },
-            ]}>
-            <Text style={styles.photoPlaceholder}>👤</Text>
+        <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <View style={[styles.avatar, { backgroundColor: Palette.secondary + '30', borderColor: Palette.primary }]}>
+            <Text style={styles.avatarEmoji}>💧</Text>
           </View>
-
-          <Text style={[styles.profileName, { color: colors.text }]}>{user ? `${user.prenom} ${user.nom}` : 'Prénom Nom'}</Text>
-          <Text style={[styles.profileUsername, { color: Palette.secondary }]}>
-            {user?.username || 'Nom d\'Utilisateur'}
+          <Text style={[styles.profileName, { color: colors.text }]}>
+            {user ? `${user.prenom ?? ''} ${user.nom ?? ''}`.trim() || user.username : '—'}
           </Text>
-
-          <Text style={[styles.profileBio, { color: colors.icon }]}>{user?.bio || 'Écris ta biographie ici...'}</Text>
+          <Text style={[styles.profileUsername, { color: Palette.secondary }]}>
+            @{user?.username ?? '—'}
+          </Text>
+          <Text style={[styles.profileBio, { color: colors.icon }]}>
+            {user?.bio ?? 'Aucune biographie pour le moment.'}
+          </Text>
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={[styles.statValue, { color: Palette.primary }]}>
-                {userProfile.friends}
+                {isLoading ? '…' : `${totalWeek.toFixed(1)}L`}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.icon }]}>Amis</Text>
+              <Text style={[styles.statLabel, { color: colors.icon }]}>Cette semaine</Text>
             </View>
-
+            <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={[styles.statValue, { color: Palette.secondary }]}>
-                {userProfile.challenges}
+                {isLoading ? '…' : `${dailyGoalL.toFixed(1)}L`}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.icon }]}>Défis</Text>
+              <Text style={[styles.statLabel, { color: colors.icon }]}>Objectif/jour</Text>
             </View>
-
+            <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={[styles.statValue, { color: Palette.accent }]}>
-                {userProfile.dailyGoal}
+                {isLoading ? '…' : `${Math.round((totalWeek / (dailyGoalL * 7)) * 100)}%`}
               </Text>
-              <Text style={[styles.statLabel, { color: colors.icon }]}>Objectif</Text>
+              <Text style={[styles.statLabel, { color: colors.icon }]}>Semaine</Text>
             </View>
-          </View>
-
-          <Button
-            title={editMode ? 'Annuler' : 'Modifier le profil'}
-            onPress={() => setEditMode(!editMode)}
-            variant={editMode ? 'outline' : 'secondary'}
-            size="medium"
-            style={styles.editButton}
-          />
-        </View>
-
-        {/* Profile Information */}
-        <View
-          style={[
-            styles.infoSection,
-            { backgroundColor: colors.background, borderColor: colors.border },
-          ]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            Informations personnelles
-          </Text>
-
-          <View style={styles.infoItem}>
-            <Text style={[styles.infoLabel, { color: colors.icon }]}>Email</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{user?.email || 'Email non spécifié'}</Text>
-          </View>
-
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-          <View style={styles.infoItem}>
-            <Text style={[styles.infoLabel, { color: colors.icon }]}>Âge</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{user?.age || 'Âge non spécifié'} ans</Text>
-          </View>
-
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-          <View style={styles.infoItem}>
-            <Text style={[styles.infoLabel, { color: colors.icon }]}>Sexe</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{user?.gender || 'Sexe non spécifié'}</Text>
-          </View>
-
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-          <View style={styles.infoItem}>
-            <Text style={[styles.infoLabel, { color: colors.icon }]}>Région</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{user?.region || 'Région non spécifiée'}</Text>
-          </View>
-
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-          <View style={styles.infoItem}>
-            <Text style={[styles.infoLabel, { color: colors.icon }]}>Poids</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{user?.weight || 'Poids non spécifié'}</Text>
-          </View>
-
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-          <View style={styles.infoItem}>
-            <Text style={[styles.infoLabel, { color: colors.icon }]}>Activité sportive</Text>
-            <Text style={[styles.infoValue, { color: colors.text }]}>{user?.sport || 'Activité non spécifiée'}</Text>
           </View>
         </View>
 
-        {/* Friends Section */}
-        <View
-          style={[
-            styles.infoSection,
-            { backgroundColor: colors.background, borderColor: colors.border },
-          ]}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Mes amis</Text>
-            <Pressable>
-              <Text style={[styles.addFriend, { color: Palette.secondary }]}>+ Ajouter</Text>
-            </Pressable>
-          </View>
+        {/* Weekly Bar Chart */}
+        <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Hydratation — 7 derniers jours</Text>
 
-          {[1, 2, 3].map((i) => (
-            <View key={i} style={styles.friendItem}>
-              <View
-                style={[
-                  styles.friendPhoto,
-                  {
-                    backgroundColor:
-                      i % 2 === 0 ? Palette.secondary : Palette.accent,
-                  },
-                ]}>
-                <Text>👤</Text>
+          {isLoading ? (
+            <ActivityIndicator color={Palette.primary} style={{ marginVertical: 24 }} />
+          ) : (
+            <>
+              <View style={styles.chartContainer}>
+                {weeklyData.map((day, i) => {
+                  const barHeight = Math.max(4, (day.total / maxBar) * BAR_MAX_HEIGHT);
+                  const isGoalMet = day.total >= dailyGoalL;
+                  return (
+                    <View key={i} style={styles.barColumn}>
+                      <Text style={[styles.barValue, { color: colors.icon }]}>
+                        {day.total > 0 ? `${day.total.toFixed(1)}` : ''}
+                      </Text>
+                      <View style={styles.barTrack}>
+                        {/* Goal line */}
+                        <View style={[styles.goalLine, {
+                          bottom: (dailyGoalL / maxBar) * BAR_MAX_HEIGHT,
+                          borderColor: Palette.accent + '80',
+                        }]} />
+                        <View style={[styles.bar, {
+                          height: barHeight,
+                          backgroundColor: isGoalMet ? Palette.secondary : Palette.primary + 'CC',
+                        }]} />
+                      </View>
+                      <Text style={[styles.barLabel, { color: colors.icon }]}>{day.day}</Text>
+                    </View>
+                  );
+                })}
               </View>
-              <View style={styles.friendInfo}>
-                <Text style={[styles.friendName, { color: colors.text }]}>
-                  Ami {i}
-                </Text>
-                <Text style={[styles.friendUsername, { color: colors.icon }]}>
-                  @ami{i}
-                </Text>
+
+              <View style={styles.legendRow}>
+                <View style={[styles.legendDot, { backgroundColor: Palette.secondary }]} />
+                <Text style={[styles.legendText, { color: colors.icon }]}>Objectif atteint</Text>
+                <View style={[styles.legendDot, { backgroundColor: Palette.primary + 'CC', marginLeft: 12 }]} />
+                <Text style={[styles.legendText, { color: colors.icon }]}>En cours</Text>
+                <View style={[styles.legendLine, { borderColor: Palette.accent + '80', marginLeft: 12 }]} />
+                <Text style={[styles.legendText, { color: colors.icon }]}>Objectif</Text>
               </View>
-              <Pressable>
-                <Text style={[styles.removeButton, { color: Palette.dark }]}>✕</Text>
-              </Pressable>
-            </View>
+            </>
+          )}
+        </View>
+
+        {/* Personal Info */}
+        <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Informations personnelles</Text>
+
+          {[
+            { label: 'Email', value: profileData?.email ?? user?.email ?? '—' },
+            { label: 'Nom d\'utilisateur', value: profileData?.username ?? user?.username ?? '—' },
+            { label: 'Objectif quotidien', value: `${dailyGoalL.toFixed(1)} L` },
+          ].map(({ label, value }, i, arr) => (
+            <React.Fragment key={label}>
+              <View style={styles.infoItem}>
+                <Text style={[styles.infoLabel, { color: colors.icon }]}>{label}</Text>
+                <Text style={[styles.infoValue, { color: colors.text }]}>{value}</Text>
+              </View>
+              {i < arr.length - 1 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
+            </React.Fragment>
           ))}
-
-          <Pressable style={[styles.viewMore, { borderTopColor: colors.border }]}>
-            <Text style={[styles.viewMoreText, { color: Palette.secondary }]}>
-              Voir tous mes amis →
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Preferences */}
-        <View
-          style={[
-            styles.infoSection,
-            { backgroundColor: colors.background, borderColor: colors.border },
-          ]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Préférences</Text>
-
-          <Pressable
-            style={[
-              styles.preferenceItem,
-              { borderBottomColor: colors.border },
-            ]}>
-            <Text style={[styles.preferenceLabel, { color: colors.text }]}>
-              Notifications
-            </Text>
-            <Text style={[styles.arrow, { color: colors.icon }]}>→</Text>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.preferenceItem,
-              { borderBottomColor: colors.border },
-            ]}>
-            <Text style={[styles.preferenceLabel, { color: colors.text }]}>
-              Thème
-            </Text>
-            <Text style={[styles.arrow, { color: colors.icon }]}>→</Text>
-          </Pressable>
-
-          <Pressable style={styles.preferenceItem}>
-            <Text style={[styles.preferenceLabel, { color: colors.text }]}>
-              À propos
-            </Text>
-            <Text style={[styles.arrow, { color: colors.icon }]}>→</Text>
-          </Pressable>
         </View>
 
         {/* Logout */}
         <Button
           title="Se déconnecter"
-          onPress={() => {
-            logout();
-          }}
+          onPress={logout}
           variant="danger"
           size="large"
           style={styles.logoutButton}
@@ -263,161 +237,41 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    padding: 16,
-    paddingBottom: 20,
-  },
-  profileHeader: {
-    borderRadius: 12,
-    padding: 20,
-    marginVertical: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  profilePhoto: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-    borderWidth: 3,
-    fontSize: 40,
-  },
-  photoPlaceholder: {
-    fontSize: 40,
-  },
-  profileName: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  profileUsername: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  profileBio: {
-    fontSize: 12,
-    textAlign: 'center',
-    marginBottom: 16,
-    fontStyle: 'italic',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    marginVertical: 16,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  statLabel: {
-    fontSize: 12,
-    marginTop: 4,
-  },
-  editButton: {
-    marginTop: 16,
-    minWidth: 150,
-  },
-  infoSection: {
-    borderRadius: 12,
-    padding: 16,
-    marginVertical: 12,
+  container: { flex: 1 },
+  scrollContent: { flexGrow: 1, padding: 16, paddingBottom: 32 },
+  card: {
+    borderRadius: 16, padding: 20, marginVertical: 8,
     borderWidth: 1,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
+  avatar: {
+    width: 80, height: 80, borderRadius: 40,
+    justifyContent: 'center', alignItems: 'center',
+    alignSelf: 'center', marginBottom: 12, borderWidth: 3,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  addFriend: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  infoItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  infoLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  infoValue: {
-    fontSize: 12,
-  },
-  divider: {
-    height: 1,
-    marginVertical: 8,
-  },
-  friendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-  },
-  friendPhoto: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  friendInfo: {
-    flex: 1,
-  },
-  friendName: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  friendUsername: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-  removeButton: {
-    fontSize: 16,
-  },
-  viewMore: {
-    paddingTop: 12,
-    borderTopWidth: 1,
-    marginTop: 8,
-  },
-  viewMoreText: {
-    fontSize: 12,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  preferenceItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  preferenceLabel: {
-    fontSize: 14,
-  },
-  arrow: {
-    fontSize: 14,
-  },
-  logoutButton: {
-    marginTop: 12,
-    marginBottom: 20,
-  },
+  avatarEmoji: { fontSize: 36 },
+  profileName: { fontSize: 20, fontWeight: '700', textAlign: 'center', marginBottom: 4 },
+  profileUsername: { fontSize: 14, fontWeight: '500', textAlign: 'center', marginBottom: 8 },
+  profileBio: { fontSize: 12, textAlign: 'center', marginBottom: 16, fontStyle: 'italic' },
+  statsRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingTop: 12, borderTopWidth: 1, borderTopColor: '#00000010' },
+  statItem: { alignItems: 'center', flex: 1 },
+  statDivider: { width: 1, height: 40, backgroundColor: '#00000015' },
+  statValue: { fontSize: 20, fontWeight: '700' },
+  statLabel: { fontSize: 11, marginTop: 4, textAlign: 'center' },
+  sectionTitle: { fontSize: 15, fontWeight: '600', marginBottom: 16 },
+  chartContainer: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: BAR_MAX_HEIGHT + 40, marginBottom: 8 },
+  barColumn: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
+  barValue: { fontSize: 9, marginBottom: 4 },
+  barTrack: { width: '60%', height: BAR_MAX_HEIGHT, justifyContent: 'flex-end', position: 'relative' },
+  bar: { width: '100%', borderRadius: 4 },
+  goalLine: { position: 'absolute', left: -2, right: -2, borderTopWidth: 1, borderStyle: 'dashed' },
+  barLabel: { fontSize: 10, marginTop: 6 },
+  legendRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: 8 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendLine: { width: 14, borderTopWidth: 1, borderStyle: 'dashed' },
+  legendText: { fontSize: 10 },
+  infoItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
+  infoLabel: { fontSize: 13, fontWeight: '500' },
+  infoValue: { fontSize: 13 },
+  divider: { height: 1 },
+  logoutButton: { marginTop: 16, marginBottom: 8 },
 });

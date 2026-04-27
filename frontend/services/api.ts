@@ -297,3 +297,14 @@ export const hydrationApi = {
     });
   }
 };
+
+export const rankingApi = {
+  getAll: () => request('/users/ranking/all'),
+};
+
+export const profileApi = {
+  getById: (userId: string) => request(`/users/${userId}`),
+  getConsumption: (userId: string, startDate: string, endDate: string) =>
+    request(`/users/${userId}/consumption?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`),
+  getWaterHistory: (userId: string) => request(`/users/${userId}/water`),
+};

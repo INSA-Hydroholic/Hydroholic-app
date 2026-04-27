@@ -22,6 +22,7 @@ import { useBLE } from '@/hooks/useBLE';
 import { LoadCellGraph } from '@/components/LoadCellGraph';
 import { useAuth } from '@/context/AuthContext';
 import { usersApi } from '@/services/api';
+import { challengesApi } from '@/services/api';
 
 const MAX_LOAD_CELL_POINTS = 1000;
 const CONSUMPTION_REFRESH_MS = 10_000;
@@ -29,7 +30,6 @@ const CONSUMPTION_REFRESH_MS = 10_000;
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { user } = useAuth();
 
   const [menuVisible, setMenuVisible] = useState(false);
   const [hydrationAmount, setHydrationAmount] = useState(1.8);
@@ -50,6 +50,36 @@ export default function HomeScreen() {
     logs,
   } = useBLE();
   const [scaleInput, setScaleInput] = useState('');
+
+  const { user } = useAuth();
+  const [userChallenges, setUserChallenges] = useState<any[]>([]);
+
+useEffect(() => {
+  if (!user?.id) return;
+  challengesApi.getAll()
+    .then((res) => {
+      const all = Array.isArray(res) ? res : [];
+      const userId = String(user.id);
+      // Solo los que el usuario ya joined
+      const mine = all.filter((c) =>
+        (c.participants ?? []).some((p: any) => String(p.userID) === userId)
+      );
+      setUserChallenges(mine);
+    })
+    .catch(console.error);
+}, [user?.id]);
+
+// Función de progreso (igual que en ChallengesScreen):
+const getChallengeProgress = (challenge: any) => {
+  const userId = String(user?.id ?? '');
+  const objective = Number(challenge.objective_ml || 0);
+  const participant = (challenge.participants ?? []).find(
+    (p: any) => String(p.userID) === userId
+  );
+  const progress = Number(participant?.progress_ml ?? 0);
+  if (!objective || !progress) return 0;
+  return Math.max(0, Math.min(100, Math.round((progress / objective) * 100)));
+};
 
   useEffect(() => {
     if (scaleFactor !== null) {
@@ -252,34 +282,31 @@ export default function HomeScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Hydration Card */}
-        <HydrationCard
-          current={hydrationAmount}
-          goal={hydrationGoal}
-          onAddWater={handleAddWater}
-        />
+         <HydrationCard
+    current={hydrationAmount}
+    goal={hydrationGoal}
+    onAddWater={handleAddWater}
+  />
 
         {/* Objective Card */}
         <ObjectiveCard objective={hydrationGoal} region="Rhône-Alpes" />
 
         {/* Challenges Section */}
-        <View style={styles.sectionContainer}>
-          <ChallengeCard
-            name="Défi hydra... pour les nuls"
-            progress={68}
-            isOngoing={true}
-          />
-          <ChallengeCard
-            name="Semaine de l'hydratation"
-            progress={45}
-            isOngoing={false}
-          />
-        </View>
+        {userChallenges.length > 0 && (
+          <View style={styles.sectionContainer}>
+            {userChallenges.slice(0, 2).map((challenge) => (
+              <ChallengeCard
+                key={challenge.id}
+                name={challenge.title}
+                progress={getChallengeProgress(challenge)}
+                isOngoing={challenge.status === 'active'}
+              />
+            ))}
+          </View>
+        )}
 
-        {/* Ranking Card */}
-        <RankingCard rankings={rankings} />
-
-        {/* History Card */}
-        <HistoryCard data={historyData} weeklyProgress={12} />
+        <RankingCard />
+        <HistoryCard />
       </ScrollView>
     </SafeAreaView>
   );
