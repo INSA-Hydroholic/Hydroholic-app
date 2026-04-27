@@ -182,7 +182,7 @@ export default function RegisterScreen() {
           />
 
           <InputField
-            label="Âge (facultatif)"
+            label="Âge"
             placeholder="25"
             value={formData.age}
             onChangeText={(text) => {
@@ -193,7 +193,7 @@ export default function RegisterScreen() {
           />
 
           <InputField
-            label="Poids en kg (facultatif)"
+            label="Poids en kg"
             placeholder="70"
             value={formData.poids}
             onChangeText={(text) => {
@@ -204,7 +204,7 @@ export default function RegisterScreen() {
           />
 
           <InputField
-            label="Activité modérée par semainen en minutes (facultatif)"
+            label="Activité modérée par semaine en minutes"
             placeholder="120"
             value={formData.activiteModeree}
             onChangeText={(text) => {
@@ -215,7 +215,7 @@ export default function RegisterScreen() {
           />
 
           <InputField
-            label="Activité intense par semainen en minutes (facultatif)"
+            label="Activité intense par semaine en minutes"
             placeholder="60"
             value={formData.activiteIntense}
             onChangeText={(text) => {
