@@ -9,12 +9,10 @@ export type UserProfile = {
   telephone?: string;
   age?: number;
   sexe?: string;
-  region?: string;
   poids?: number;
-  activiteSportive?: {
-    seances: number;
-    intensive: boolean;
-  };
+  activiteIntense?: number; // en minutes par semaine
+  activiteModeree?: number; // en minutes par semaine
+  temperatureLieu?: string; // "<20" ou ">20"
   photo?: string;
   bio?: string;
   objectifJournalier: number; // en litres

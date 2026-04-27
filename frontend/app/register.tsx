@@ -8,6 +8,7 @@ import {
   Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Picker } from '@react-native-picker/picker';
 import { Colors, Palette } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { InputField } from '@/components/InputField';
@@ -21,6 +22,7 @@ export default function RegisterScreen() {
   const router = useRouter();
 
   const [formData, setFormData] = useState({
+    //Champs obligatoires
     nom: '',
     prenom: '',
     username: '',
@@ -28,6 +30,14 @@ export default function RegisterScreen() {
     telephone: '',
     password: '',
     confirmPassword: '',
+
+    //Champs facultatifs
+    age: '',                // En années
+    poids: '',              // En kg
+    sexe: '',               // "H" ou "F"
+    activiteIntense: '',    // minutes/semaine
+    activiteModeree: '',    // minutes/semaine
+    temperatureLieu: '',    // "<20" ou ">20"
   });
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -171,6 +181,70 @@ export default function RegisterScreen() {
             error={errors.confirmPassword}
           />
 
+          <InputField
+            label="Âge (facultatif)"
+            placeholder="25"
+            value={formData.age}
+            onChangeText={(text) => {
+              setFormData({ ...formData, age: text });
+            }}
+            type="number"
+            optional
+          />
+
+          <InputField
+            label="Poids en kg (facultatif)"
+            placeholder="70"
+            value={formData.poids}
+            onChangeText={(text) => {
+              setFormData({ ...formData, poids: text });
+            }}
+            type="number"
+            optional
+          />
+
+          <InputField
+            label="Activité modérée par semainen en minutes (facultatif)"
+            placeholder="120"
+            value={formData.activiteModeree}
+            onChangeText={(text) => {
+              setFormData({ ...formData, activiteModeree: text });
+            }}
+            type="number"
+            optional
+          />
+
+          <InputField
+            label="Activité intense par semainen en minutes (facultatif)"
+            placeholder="60"
+            value={formData.activiteIntense}
+            onChangeText={(text) => {
+              setFormData({ ...formData, activiteIntense: text });
+            }}
+            type="number"
+            optional
+          />
+
+          <Text style={styles.label}>Sexe (facultatif)</Text>
+          <Picker
+            selectedValue={formData.sexe}
+            onValueChange={(itemValue) => 
+              setFormData({ ...formData, sexe: itemValue })}>
+            <Picker.Item label="Sélectionner..." value="" />
+            <Picker.Item label="Homme" value="H" />
+            <Picker.Item label="Femme" value="F" />
+          </Picker>
+
+          <Text style={styles.label}>Température de votre lieu de vie (facultatif)</Text>
+          <Picker
+            selectedValue={formData.temperatureLieu}
+            onValueChange={(itemValue) => 
+              setFormData({ ...formData, temperatureLieu: itemValue })}>
+            <Picker.Item label="Sélectionner..." value="" />
+            <Picker.Item label="Moins de 20°C" value="<20" />
+            <Picker.Item label="Plus de 20°C" value=">20" />
+          </Picker>
+
           <Button
             title={isLoading ? "Inscription..." : "S'inscrire"}
             onPress={handleRegister}
@@ -257,5 +331,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     textDecorationLine: 'underline',
+  },
+
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.light.text,
+    marginBottom: 8,
+    marginTop: 15,
   },
 });
