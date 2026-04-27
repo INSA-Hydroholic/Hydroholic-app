@@ -20,13 +20,13 @@ export const HydrationCard: React.FC<HydrationCardProps> = ({ current, goal, onA
       <Text style={[styles.title, { color: colors.text }]}>Ton hydratation aujourd'hui</Text>
 
       <View style={styles.progressContainer}>
-        {/* Logo de la gota - Lado izquierdo */}
+        {/* Logo */}
         <Image
           source={require('../assets/images/hydroholic/logo.png')}
           style={styles.waterDropLogo}
         />
         
-        {/* Círculo de progresión - Lado derecho */}
+        
         <View
           style={[
             styles.progressCircle,
@@ -45,25 +45,6 @@ export const HydrationCard: React.FC<HydrationCardProps> = ({ current, goal, onA
       <Text style={[styles.motivationalText, { color: Palette.secondary }]}>
         {remaining > 0 ? `Encore ${remaining.toFixed(1)}L pour atteindre ton objectif` : '🎉 Bravo, objectif atteint!'}
       </Text>
-
-      {/* Boutons rapides */}
-      <View style={styles.buttonsContainer}>
-        <Pressable
-          style={[styles.button, { backgroundColor: Palette.accent }]}
-          onPress={() => onAddWater(0.25)}>
-          <Text style={[styles.buttonText, { color: colors.background }]}>+250ml</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.button, { backgroundColor: Palette.secondary }]}
-          onPress={() => onAddWater(0.5)}>
-          <Text style={[styles.buttonText, { color: colors.background }]}>+500ml</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.button, { backgroundColor: Palette.dark }]}
-          onPress={() => onAddWater(1)}>
-          <Text style={[styles.buttonText, { color: colors.background }]}>+1L</Text>
-        </Pressable>
-      </View>
     </View>
   );
 };
