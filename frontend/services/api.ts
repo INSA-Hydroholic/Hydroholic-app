@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL =  'http://localhost:4000/api';
+const API_URL =  'https://agir.minettoar.org/api';
 const USE_MOCK_API = process.env.EXPO_PUBLIC_USE_MOCK_API === 'true';
 const MOCK_CHALLENGES_KEY = 'mock:challenges:v1';
 let authToken: string | null = null;
