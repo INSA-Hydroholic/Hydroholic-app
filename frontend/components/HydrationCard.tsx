@@ -1,42 +1,140 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, Image, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Image, ActivityIndicator, Pressable, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { Colors, Palette } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { profileApi, hydrationApi } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 
+const HYDRATION_REMINDER_THRESHOLD_MS = 3 * 60 * 60 * 1000;
+const HYDRATION_REMINDER_STORAGE_PREFIX = 'hydration-reminder:v1';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
+
 interface HydrationCardProps {
+  current?: number;
+  goal?: number;
   onAddWater?: (amount: number) => void; // opcional, solo para notificar al padre
 }
 
-export const HydrationCard: React.FC<HydrationCardProps> = ({ onAddWater }) => {
+export const HydrationCard: React.FC<HydrationCardProps> = ({
+  current: initialCurrent,
+  goal: initialGoal,
+  onAddWater,
+}) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { user } = useAuth();
 
-  const [current, setCurrent] = useState(0);
-  const [goal, setGoal] = useState(2); // 2L por defecto
+  const [current, setCurrent] = useState(initialCurrent ?? 0);
+  const [goal, setGoal] = useState(initialGoal ?? 2); // 2L por defecto
   const [isLoading, setIsLoading] = useState(true);
   const [addingAmount, setAddingAmount] = useState<number | null>(null);
+  const [lastHydrationAt, setLastHydrationAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof initialCurrent === 'number' && Number.isFinite(initialCurrent)) {
+      setCurrent(initialCurrent);
+    }
+  }, [initialCurrent]);
+
+  useEffect(() => {
+    if (typeof initialGoal === 'number' && Number.isFinite(initialGoal)) {
+      setGoal(initialGoal);
+    }
+  }, [initialGoal]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+
+    void Notifications.setNotificationChannelAsync('hydration-reminders', {
+      name: 'Hydration reminders',
+      importance: Notifications.AndroidImportance.DEFAULT,
+    });
+  }, []);
+
+  const syncHydrationReminder = useCallback(
+    async (nextCurrent: number, nextGoal: number, nextLastHydrationAt: string | null) => {
+      if (!user?.id) {
+        return;
+      }
+
+      const permission = await Notifications.getPermissionsAsync();
+      if (permission.status !== 'granted') {
+        const requested = await Notifications.requestPermissionsAsync();
+        if (requested.status !== 'granted') {
+          return;
+        }
+      }
+
+      const storageKey = `${HYDRATION_REMINDER_STORAGE_PREFIX}:${String(user.id)}`;
+      const storedRaw = await AsyncStorage.getItem(storageKey);
+      const stored = storedRaw ? (JSON.parse(storedRaw) as { notificationId: string }) : null;
+
+      if (nextCurrent >= nextGoal) {
+        if (stored?.notificationId) {
+          await Notifications.cancelScheduledNotificationAsync(stored.notificationId).catch(() => {});
+        }
+        await AsyncStorage.removeItem(storageKey);
+        return;
+      }
+
+      if (stored?.notificationId) {
+        return;
+      }
+
+      const notificationId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Hydroholic',
+          body: 'Tu n\'as pas bu depuis un moment. Pense à boire de l\'eau pour avancer vers ton objectif.',
+          sound: 'default',
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: HYDRATION_REMINDER_THRESHOLD_MS / 1000,
+          repeats: true,
+        },
+      });
+
+      await AsyncStorage.setItem(storageKey, JSON.stringify({ notificationId }));
+    },
+    [user?.id]
+  );
 
 
   const fetchCurrent = useCallback(async () => {
   if (!user?.id) return;
-  const now = new Date();
-  const startOfDay = new Date(now);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(now);
-  endOfDay.setHours(23, 59, 59, 999);
 
-  const consumption = await profileApi.getConsumption(
-    String(user.id),
-    startOfDay.toISOString(),
-    endOfDay.toISOString()
-  );
-  const liters = Number((consumption as any)?.totalVolume ?? 0) / 1000;
-  setCurrent(Math.round(liters * 100) / 100);
+  const logs = (await profileApi.getWaterHistory(String(user.id))) as Array<{
+    weight: number;
+    measured_at: string;
+  }>;
 
-  console.log(consumption);
+  const totalMilliliters = logs.reduce((sum, log) => sum + Number(log.weight ?? 0), 0);
+  const latestLog = logs.reduce<{
+    weight: number;
+    measured_at: string;
+  } | null>((latest, log) => {
+    if (!latest) {
+      return log;
+    }
+
+    return new Date(log.measured_at).getTime() > new Date(latest.measured_at).getTime() ? log : latest;
+  }, null);
+
+  setCurrent(Math.round((totalMilliliters / 1000) * 100) / 100);
+  setLastHydrationAt(latestLog?.measured_at ?? null);
 }, [user?.id]);
 
 
@@ -57,6 +155,14 @@ export const HydrationCard: React.FC<HydrationCardProps> = ({ onAddWater }) => {
 }, [user?.id, fetchCurrent]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
+
+    useEffect(() => {
+      if (!user?.id || isLoading) {
+        return;
+      }
+
+      void syncHydrationReminder(current, goal, lastHydrationAt);
+    }, [current, goal, isLoading, lastHydrationAt, syncHydrationReminder, user?.id]);
 
   const handleAddWater = async (liters: number) => {
   if (!user?.id || addingAmount !== null) return;
