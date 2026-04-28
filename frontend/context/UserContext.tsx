@@ -12,7 +12,7 @@ export type UserProfile = {
   poids?: number;
   activiteIntense?: number; // en minutes par semaine
   activiteModeree?: number; // en minutes par semaine
-  temperatureLieu?: string; // "<20" ou ">20"
+  ville?: string; 
   photo?: string;
   bio?: string;
   objectifJournalier: number; // en litres
