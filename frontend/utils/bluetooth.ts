@@ -65,7 +65,7 @@ export async function connectToHydroholicBottle(): Promise<Result> {
     return {
       ok: false,
       message:
-        'Bluetooth Web no disponible en esta plataforma. Usa la versión web (https/localhost) o integra BLE nativo para Android/iOS.',
+        'Bluetooth Web',
     };
   }
 
