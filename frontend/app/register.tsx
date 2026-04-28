@@ -225,7 +225,7 @@ export default function RegisterScreen() {
             optional
           />
 
-          <Text style={styles.label}>Sexe (facultatif)</Text>
+          <Text style={styles.label}>Sexe</Text>
           <Picker
             selectedValue={formData.sexe}
             onValueChange={(itemValue: any) => 
@@ -236,7 +236,7 @@ export default function RegisterScreen() {
           </Picker>
 
           <InputField
-            label="Ville (facultatif)"
+            label="Ville de résidence"
             placeholder="Paris"
             value={formData.ville}
             onChangeText={(text) => {
