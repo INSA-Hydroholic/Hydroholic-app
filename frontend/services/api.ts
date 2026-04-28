@@ -1,12 +1,51 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000/api';
+const API_URL =  'http://localhost:4000/api';
 const USE_MOCK_API = process.env.EXPO_PUBLIC_USE_MOCK_API === 'true';
 const MOCK_CHALLENGES_KEY = 'mock:challenges:v1';
 let authToken: string | null = null;
 
 export const setAuthToken = (token: string | null) => {
   authToken = token;
+};
+
+
+const authFetch = async (endpoint: string, options: RequestInit = {}) => {
+  const token = await AsyncStorage.getItem('auth_token'); 
+
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+};
+
+export const challengesApi = {
+  getAll: () => authFetch('/challenges'),
+
+  getById: (id: string) => authFetch(`/challenges/${id}`),
+
+  create: (data: { name: string; type: string; objective: number; description?: string }) =>
+    authFetch('/challenges', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  join: (challengeId: number, userId: string) =>
+    authFetch(`/challenges/${challengeId}/join`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }),
 };
 
 type RequestOptions = {
@@ -210,22 +249,6 @@ const mockChallengesApi = {
   },
 };
 
-export const challengesApi = {
-  getAll: () => (USE_MOCK_API ? mockChallengesApi.getAll() : request('/challenges')),
-  create: (payload: { name: string; type: string; objective: number; duration: string; creatorId: string }) =>
-    USE_MOCK_API
-      ? mockChallengesApi.create(payload)
-      : request('/challenges', { method: 'POST', body: payload }),
-  join: (challengeId: string, userId: string) =>
-    USE_MOCK_API
-      ? mockChallengesApi.join(challengeId, userId)
-      : request(`/challenges/${challengeId}/join`, { method: 'POST', body: { userId } }),
-  progress: (challengeId: string, userId: string, amountMl: number) =>
-    USE_MOCK_API
-      ? mockChallengesApi.progress(challengeId, userId, amountMl)
-      : request(`/challenges/${challengeId}/progress`, { method: 'POST', body: { userId, amountMl } })
-};
-
 export const usersApi = {
   getAll: () => request('/users'),
   getById: (userId: string) => request(`/users/${userId}`),
@@ -273,4 +296,15 @@ export const hydrationApi = {
       }
     });
   }
+};
+
+export const rankingApi = {
+  getAll: () => request('/users/ranking/all'),
+};
+
+export const profileApi = {
+  getById: (userId: string) => request(`/users/${userId}`),
+  getConsumption: (userId: string, startDate: string, endDate: string) =>
+    request(`/users/${userId}/consumption?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`),
+  getWaterHistory: (userId: string) => request(`/users/${userId}/water`),
 };

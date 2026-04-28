@@ -1,243 +1,155 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View,
-  StyleSheet,
-  ScrollView,
-  SafeAreaView,
-  Text,
-  Pressable,
+  View, StyleSheet, ScrollView, SafeAreaView,
+  Text, Pressable, ActivityIndicator,
 } from 'react-native';
 import { Colors, Palette } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Header } from '@/components/Header';
 import { SideMenu } from '@/components/SideMenu';
-import { RankingCard } from '@/components/RankingCard';
-import { Button } from '@/components/Button';
+import { rankingApi } from '@/services/api';
+import { useAuth } from '@/context/AuthContext';
+
+type RankingEntry = {
+  userID: number;
+  username: string;
+  _sum: { weight: number | null };
+};
+
+const MEDALS = ['🥇', '🥈', '🥉'];
 
 export default function RankingScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const [menuVisible, setMenuVisible] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState<'jour' | 'semaine' | 'mois'>('jour');
+  const { user } = useAuth();
 
-  // Mock data for different periods
-  const rankingsData = {
-    jour: [
-      { id: '1', name: 'Sarah', water: 3.8 },
-      { id: '2', name: 'Mehdi', water: 3.5 },
-      { id: '3', name: 'Toi', water: 3.2, isCurrentUser: true },
-      { id: '4', name: 'Lina', water: 2.9 },
-      { id: '5', name: 'Alex', water: 2.7 },
-      { id: '6', name: 'Marie', water: 2.5 },
-      { id: '7', name: 'Pierre', water: 2.3 },
-      { id: '8', name: 'Emma', water: 2.0 },
-    ],
-    semaine: [
-      { id: '1', name: 'Sarah', water: 26.4 },
-      { id: '2', name: 'Mehdi', water: 24.5 },
-      { id: '3', name: 'Toi', water: 22.4, isCurrentUser: true },
-      { id: '4', name: 'Lina', water: 20.3 },
-      { id: '5', name: 'Alex', water: 18.9 },
-      { id: '6', name: 'Marie', water: 17.5 },
-      { id: '7', name: 'Pierre', water: 16.1 },
-      { id: '8', name: 'Emma', water: 14.0 },
-    ],
-    mois: [
-      { id: '1', name: 'Sarah', water: 84.0 },
-      { id: '2', name: 'Mehdi', water: 82.5 },
-      { id: '3', name: 'Toi', water: 78.2, isCurrentUser: true },
-      { id: '4', name: 'Lina', water: 76.3 },
-      { id: '5', name: 'Alex', water: 72.9 },
-      { id: '6', name: 'Marie', water: 70.5 },
-      { id: '7', name: 'Pierre', water: 68.1 },
-      { id: '8', name: 'Emma', water: 64.0 },
-    ],
-  };
+  const [ranking, setRanking] = useState<RankingEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const currentRankings = rankingsData[selectedPeriod];
-  const userPosition = currentRankings.findIndex((r) => r.isCurrentUser) + 1;
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const data = await rankingApi.getAll();
+      setRanking(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      setError(e?.message || 'Impossible de charger le classement.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const userId = user?.id;
+  const userPosition = ranking.findIndex((r) => r.userID === userId) + 1;
+  const maxWeight = Math.max(...ranking.map((r) => r._sum.weight ?? 0), 1);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Header
         onMenuPress={() => setMenuVisible(true)}
-        onNotificationsPress={() => console.log('Notifications')}
-        onProfilePress={() => console.log('Profile')}
-        
+        onNotificationsPress={() => {}}
+        onProfilePress={() => {}}
       />
-
-      <SideMenu
-        visible={menuVisible}
-        onClose={() => setMenuVisible(false)}
-        onItemPress={() => {}}
-      />
+      <SideMenu visible={menuVisible} onClose={() => setMenuVisible(false)} onItemPress={() => {}} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Period Selection */}
-        <View style={styles.periodSelector}>
-          {(['jour', 'semaine', 'mois'] as const).map((period) => (
-            <Pressable
-              key={period}
-              style={[
-                styles.periodButton,
-                {
-                  backgroundColor:
-                    selectedPeriod === period ? Palette.primary : colors.lightGray,
-                },
-              ]}
-              onPress={() => setSelectedPeriod(period)}>
-              <Text
-                style={[
-                  styles.periodButtonText,
-                  { color: selectedPeriod === period ? '#fff' : colors.text },
-                ]}>
-                {period === 'jour' ? 'Aujourd\'hui' : period === 'semaine' ? 'Cette semaine' : 'Ce mois'}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
 
-        {/* User Position Card */}
-        <View
-          style={[
-            styles.userPositionCard,
-            {
-              backgroundColor: Palette.accent + '20',
-              borderColor: Palette.accent,
-            },
-          ]}>
-          <Text style={[styles.userPositionLabel, { color: colors.icon }]}>
-            Ta position
-          </Text>
-          <View style={styles.userPositionValue}>
-            <Text style={[styles.position, { color: Palette.primary }]}>
-              #{userPosition}
-            </Text>
-            <Text style={[styles.positionTotal, { color: colors.text }]}>
-              sur {currentRankings.length}
-            </Text>
+        {/* User position card */}
+        {userPosition > 0 && (
+          <View style={[styles.positionCard, { borderColor: Palette.accent, backgroundColor: Palette.accent + '15' }]}>
+            <Text style={[styles.positionLabel, { color: colors.icon }]}>Ta position</Text>
+            <Text style={[styles.positionValue, { color: Palette.primary }]}>#{userPosition}</Text>
+            <Text style={[styles.positionSub, { color: colors.icon }]}>sur {ranking.length} joueurs</Text>
           </View>
+        )}
+
+        {/* Ranking list */}
+        <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>🏆 Classement général</Text>
+          <Text style={[styles.sectionSub, { color: colors.icon }]}>Basé sur la consommation totale d'eau</Text>
+
+          {isLoading ? (
+            <ActivityIndicator color={Palette.primary} style={{ marginVertical: 32 }} />
+          ) : error ? (
+            <Text style={[styles.errorText, { color: Palette.dark }]}>{error}</Text>
+          ) : ranking.length === 0 ? (
+            <Text style={[styles.emptyText, { color: colors.icon }]}>Aucune donnée disponible.</Text>
+          ) : (
+            ranking.map((entry, i) => {
+              const isMe = entry.userID === userId;
+              const totalL = ((entry._sum.weight ?? 0) / 1000).toFixed(2);
+              const barWidth = ((entry._sum.weight ?? 0) / maxWeight) * 100;
+
+              return (
+                <View
+                  key={entry.userID}
+                  style={[
+                    styles.rankRow,
+                    isMe && { backgroundColor: Palette.secondary + '15', borderRadius: 10, paddingHorizontal: 8 },
+                  ]}>
+                  {/* Position */}
+                  <Text style={styles.medal}>
+                    {i < 3 ? MEDALS[i] : `#${i + 1}`}
+                  </Text>
+
+                  {/* Name + bar */}
+                  <View style={styles.rankInfo}>
+                    <View style={styles.rankNameRow}>
+                      <Text style={[styles.rankName, { color: colors.text }, isMe && { color: Palette.secondary, fontWeight: '700' }]}>
+                        {entry.username}{isMe ? ' (toi)' : ''}
+                      </Text>
+                      <Text style={[styles.rankValue, { color: colors.icon }]}>{totalL} L</Text>
+                    </View>
+                    <View style={[styles.rankBarTrack, { backgroundColor: colors.border }]}>
+                      <View style={[styles.rankBar, {
+                        width: `${barWidth}%`,
+                        backgroundColor: isMe ? Palette.secondary : i === 0 ? '#FFD700' : Palette.primary + '99',
+                      }]} />
+                    </View>
+                  </View>
+                </View>
+              );
+            })
+          )}
         </View>
 
-        {/* Full Ranking */}
-        <RankingCard rankings={currentRankings} />
+        {/* Refresh button */}
+        <Pressable onPress={() => void load()} style={styles.refreshBtn}>
+          <Text style={[styles.refreshText, { color: Palette.secondary }]}>↻ Actualiser</Text>
+        </Pressable>
 
-        {/* Categories */}
-        <View style={styles.categoriesSection}>
-          <Text style={[styles.categoryTitle, { color: colors.text }]}>
-            Classements spécialisés
-          </Text>
-
-          <Pressable
-            style={[
-              styles.categoryButton,
-              { backgroundColor: colors.background, borderColor: colors.border },
-            ]}>
-            <Text style={[styles.categoryButtonText, { color: Palette.secondary }]}>
-              🏆 Défi hebdomadaire
-            </Text>
-            <Text style={[styles.categoryButtonArrow, { color: colors.icon }]}>→</Text>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.categoryButton,
-              { backgroundColor: colors.background, borderColor: colors.border },
-            ]}>
-            <Text style={[styles.categoryButtonText, { color: Palette.accent }]}>
-              🎯 Régularité mensuelle
-            </Text>
-            <Text style={[styles.categoryButtonArrow, { color: colors.icon }]}>→</Text>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.categoryButton,
-              { backgroundColor: colors.background, borderColor: colors.border },
-            ]}>
-            <Text style={[styles.categoryButtonText, { color: Palette.dark }]}>
-              ⭐ Parmi tes amis
-            </Text>
-            <Text style={[styles.categoryButtonArrow, { color: colors.icon }]}>→</Text>
-          </Pressable>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { flex: 1 },
+  scrollContent: { flexGrow: 1, padding: 16, paddingBottom: 32 },
+  positionCard: {
+    borderRadius: 16, borderWidth: 2,
+    padding: 20, alignItems: 'center', marginBottom: 12,
   },
-  scrollContent: {
-    flexGrow: 1,
-    padding: 16,
-    paddingBottom: 20,
-  },
-  periodSelector: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  periodButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  periodButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  userPositionCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 2,
-    alignItems: 'center',
-  },
-  userPositionLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  userPositionValue: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
-  },
-  position: {
-    fontSize: 36,
-    fontWeight: '700',
-  },
-  positionTotal: {
-    fontSize: 14,
-  },
-  categoriesSection: {
-    marginTop: 24,
-  },
-  categoryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  categoryButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginVertical: 8,
-    borderWidth: 1,
-  },
-  categoryButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  categoryButtonArrow: {
-    fontSize: 14,
-  },
+  positionLabel: { fontSize: 12, fontWeight: '500', marginBottom: 4 },
+  positionValue: { fontSize: 48, fontWeight: '800', lineHeight: 56 },
+  positionSub: { fontSize: 12, marginTop: 4 },
+  card: { borderRadius: 16, padding: 20, marginVertical: 8, borderWidth: 1 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  sectionSub: { fontSize: 11, marginBottom: 16 },
+  rankRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 },
+  medal: { fontSize: 20, width: 32, textAlign: 'center' },
+  rankInfo: { flex: 1 },
+  rankNameRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  rankName: { fontSize: 13, fontWeight: '500' },
+  rankValue: { fontSize: 12 },
+  rankBarTrack: { height: 5, borderRadius: 3, overflow: 'hidden' },
+  rankBar: { height: '100%', borderRadius: 3 },
+  errorText: { fontSize: 13, fontWeight: '600', textAlign: 'center', paddingVertical: 16 },
+  emptyText: { fontSize: 13, fontStyle: 'italic', textAlign: 'center', paddingVertical: 16 },
+  refreshBtn: { alignItems: 'center', paddingVertical: 16 },
+  refreshText: { fontSize: 13, fontWeight: '600' },
 });
