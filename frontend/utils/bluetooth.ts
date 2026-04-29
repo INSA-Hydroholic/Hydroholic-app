@@ -64,8 +64,7 @@ export async function connectToHydroholicBottle(): Promise<Result> {
   if (!bluetooth) {
     return {
       ok: false,
-      message:
-        'Bluetooth Web',
+      message: 'Bluetooth Web non disponible sur cette plateforme.',
     };
   }
 
@@ -77,7 +76,7 @@ export async function connectToHydroholicBottle(): Promise<Result> {
 
     const server = await device.gatt?.connect();
     if (!server) {
-      return { ok: false, message: 'No se pudo abrir la conexión GATT con el ESP32.' };
+      return { ok: false, message: 'Impossible d\'ouvrir la connexion GATT avec l\'ESP32.' };
     }
 
     const service = await server.getPrimaryService(SERVICE_UUID);
@@ -87,11 +86,11 @@ export async function connectToHydroholicBottle(): Promise<Result> {
 
     return {
       ok: true,
-      message: payload ? `Donnée reçue: ${payload}` : 'Conectado, pero sin datos en la característica.',
+      message: payload ? `Donnée reçue : ${payload}` : 'Connecté, mais aucune donnée dans la caractéristique.',
       payload,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Error desconocido al conectar por Bluetooth.';
+    const message = error instanceof Error ? error.message : 'Erreur inconnue lors de la connexion Bluetooth.';
 
     return {
       ok: false,
