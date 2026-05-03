@@ -7,10 +7,11 @@ interface InputFieldProps {
   label: string;
   placeholder?: string;
   value: string;
-  onChangeText: (text: string) => void;
+  onChangeText?: (text: string) => void;
   type?: 'text' | 'password' | 'email' | 'phone' | 'number';
   optional?: boolean;
   error?: string;
+  editable?: boolean;
 }
 
 export const InputField: React.FC<InputFieldProps> = ({
@@ -21,6 +22,7 @@ export const InputField: React.FC<InputFieldProps> = ({
   type = 'text',
   optional = false,
   error,
+  editable = true,
 }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -59,6 +61,7 @@ export const InputField: React.FC<InputFieldProps> = ({
         onChangeText={onChangeText}
         secureTextEntry={type === 'password'}
         keyboardType={getKeyboardType()}
+        editable={editable}
       />
       {error && <Text style={[styles.error, { color: Palette.dark }]}>{error}</Text>}
     </View>

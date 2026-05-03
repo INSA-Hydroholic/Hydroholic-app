@@ -14,12 +14,42 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { InputField } from '@/components/InputField';
 import { Button } from '@/components/Button';
 import { useAuth } from '@/context/AuthContext';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Platform } from 'react-native';
 
 export default function RegisterScreen() {
   const { register } = useAuth();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [date, setDate] = useState(new Date());
+
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false); // On cache le calendrier après sélection
+    if (selectedDate) {
+      setDate(selectedDate);
+      // On stocke la date formatée dans ton formData
+      setFormData({ ...formData, date_naissance: selectedDate.toLocaleDateString('fr-FR') });
+    }
+  };
+
+  const calculateAge = (birthDateString: string): number | null => {
+    if (!birthDateString) return null;
+    // On sépare le JJ/MM/AAAA
+    const [day, month, year] = birthDateString.split('/').map(Number);
+    const birthDate = new Date(year, month - 1, day);
+    const today = new Date();
+    
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    
+    // Ajustement si l'anniversaire n'est pas encore passé cette année
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
 
   const [formData, setFormData] = useState({
     //Champs obligatoires
@@ -30,9 +60,8 @@ export default function RegisterScreen() {
     telephone: '',
     password: '',
     confirmPassword: '',
-
     //Champs facultatifs
-    age: '',                // En années
+    date_naissance : '',   // Format DD/MM/YYYY
     poids: '',              // En kg
     sexe: '',               // "H" ou "F"
     activiteIntense: '',    // minutes/semaine
@@ -59,13 +88,23 @@ export default function RegisterScreen() {
       return;
     }
 
+    const ageCalcule = calculateAge(formData.date_naissance);
+
     setIsLoading(true);
     try {
       const payload = {
         username: formData.username.trim(),
         email: formData.email.trim(),
         password: formData.password,
-        fullname: `${formData.prenom.trim()} ${formData.nom.trim()}`.trim(),
+        nom: formData.nom.trim(),
+        prenom: formData.prenom.trim(),
+        age: ageCalcule,
+        poids: parseInt(formData.poids),
+        ville: formData.ville.trim(),
+        sexe: formData.sexe.trim(),
+        telephone: formData.telephone.trim(),
+        activiteModeree: parseInt(formData.activiteModeree) || 0,
+        activiteIntense: parseInt(formData.activiteIntense) || 0,
       };
 
       await register(payload);
@@ -181,16 +220,38 @@ export default function RegisterScreen() {
             error={errors.confirmPassword}
           />
 
-          <InputField
-            label="Âge"
-            placeholder="25"
-            value={formData.age}
-            onChangeText={(text) => {
-              setFormData({ ...formData, age: text });
-            }}
-            type="number"
-            optional
-          />
+          {Platform.OS !== 'web' && (
+            <Pressable onPress={() => setShowDatePicker(true)}>
+            <View pointerEvents="none"> 
+              <InputField
+                label="Date de naissance"
+                placeholder="Sélectionnez votre date"
+                value={formData.date_naissance}
+                editable={false} 
+              />
+            </View>
+            </Pressable>
+          )}
+            {showDatePicker && (
+              <DateTimePicker
+                value={date}
+                mode="date"
+                display="default"
+                onChange={onDateChange}
+              />
+            )}
+
+          {Platform.OS == 'web' && (
+            <View>
+              <InputField
+                label="Date de naissance"
+                placeholder= "JJ/MM/AAAA"
+                value={formData.date_naissance}
+                onChangeText={(text) => setFormData({ ...formData, date_naissance: text })}
+                editable={Platform.OS === 'web'} // Autorise l'écriture seulement sur Web
+              />
+            </View>
+          )}
 
           <InputField
             label="Poids en kg"

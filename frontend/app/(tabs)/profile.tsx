@@ -209,8 +209,16 @@ export default function ProfileScreen() {
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Informations personnelles</Text>
 
           {[
-            { label: 'Email', value: profileData?.email ?? user?.email ?? '—' },
-            { label: 'Nom d\'utilisateur', value: profileData?.username ?? user?.username ?? '—' },
+            { label: 'Nom', value: user?.nom ?? '—' },
+            { label: 'Prénom', value: user?.prenom ?? '—' },
+            { label: 'Email', value: user?.email ?? '—' },
+            { label: 'Nom d\'utilisateur', value: user?.username ?? '—' },
+            { label: 'Ville', value: user?.ville ?? '—' },
+            { label: 'Poids', value: user?.poids ? `${user.poids} kg` : '—' },
+            { label: 'Âge', value: user?.age ? `${user.age} ans` : '—' },
+            { label: 'Sexe', value: user?.sexe === 'H' ? 'Homme' : (user?.sexe === 'F' ? 'Femme' : '—') },
+            { label: 'Nombre d\'heures d\'activité intenses par semaine', value: user?.activiteIntense ?? '—' },
+            { label: 'Nombre d\'heures d\'activité modérées par semaine', value: user?.activiteModeree ?? '—' },
             { label: 'Objectif quotidien', value: `${dailyGoalL.toFixed(1)} L` },
           ].map(({ label, value }, i, arr) => (
             <React.Fragment key={label}>
