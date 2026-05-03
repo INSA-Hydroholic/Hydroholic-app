@@ -125,7 +125,7 @@ export default function ProfileScreen() {
             <Text style={styles.avatarEmoji}>💧</Text>
           </View>
           <Text style={[styles.profileName, { color: colors.text }]}>
-            {user ? `${user.prenom ?? ''} ${user.nom ?? ''}`.trim() || user.username : '—'}
+            {user ? `${user?.prenom ?? ''} ${user?.nom ?? ''}`.trim() || user.username : '—'}
           </Text>
           <Text style={[styles.profileUsername, { color: Palette.secondary }]}>
             @{user?.username ?? '—'}
@@ -213,12 +213,12 @@ export default function ProfileScreen() {
             { label: 'Prénom', value: user?.prenom ?? '—' },
             { label: 'Email', value: user?.email ?? '—' },
             { label: 'Nom d\'utilisateur', value: user?.username ?? '—' },
-            { label: 'Ville', value: user?.ville ?? '—' },
-            { label: 'Poids', value: user?.poids ? `${user.poids} kg` : '—' },
+            { label: 'Ville', value: user?.city || user?.region || '—' },
+            { label: 'Poids', value: user?.weight ? `${user.weight} kg` : '—' },
             { label: 'Âge', value: user?.age ? `${user.age} ans` : '—' },
-            { label: 'Sexe', value: user?.sexe === 'H' ? 'Homme' : (user?.sexe === 'F' ? 'Femme' : '—') },
-            { label: 'Nombre d\'heures d\'activité intenses par semaine', value: user?.activiteIntense ?? '—' },
-            { label: 'Nombre d\'heures d\'activité modérées par semaine', value: user?.activiteModeree ?? '—' },
+            { label: 'Sexe', value: user?.sex === 'male' ? 'Homme' : (user?.sex === 'female' ? 'Femme' : '—') },
+            { label: 'Nombre d\'heures d\'activité intenses par semaine', value: user?.num_intense_activities ?? '—' },
+            { label: 'Nombre d\'heures d\'activité modérées par semaine', value: user?.num_moderate_activities ?? '—' },
             { label: 'Objectif quotidien', value: `${dailyGoalL.toFixed(1)} L` },
           ].map(({ label, value }, i, arr) => (
             <React.Fragment key={label}>
