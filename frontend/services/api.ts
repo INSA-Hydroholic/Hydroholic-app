@@ -55,6 +55,7 @@ type RequestOptions = {
 };
 
 const request = async (path: string, options: RequestOptions = {}) => {
+  console.log(`🚀 Appel API: ${path}`, options.body);
   const response = await fetch(`${API_URL}${path}`, {
     method: options.method || 'GET',
     headers: {
@@ -67,6 +68,7 @@ const request = async (path: string, options: RequestOptions = {}) => {
 
   if (!response.ok) {
     const errorJson = await response.json().catch(() => ({ message: response.statusText }));
+    console.log("Erreur Serveur détaillée:", errorJson);
     throw new Error(errorJson.message || 'Erreur API');
   }
 
@@ -307,4 +309,8 @@ export const profileApi = {
   getConsumption: (userId: string, startDate: string, endDate: string) =>
     request(`/users/${userId}/consumption?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`),
   getWaterHistory: (userId: string) => request(`/users/${userId}/water`),
+  updateProfile: (data: any) => request('/users/profile', { 
+      method: 'PUT', 
+      body: data 
+    }),
 };

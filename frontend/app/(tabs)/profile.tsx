@@ -2,6 +2,9 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, StyleSheet, ScrollView, SafeAreaView,
   Text, Pressable, ActivityIndicator, Dimensions,
+  Modal, Alert,
+  TextInput,
+  TouchableOpacity,
 } from 'react-native';
 import { Colors, Palette } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -81,6 +84,18 @@ export default function ProfileScreen() {
   const [totalWeek, setTotalWeek] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
+  // On initialise le formulaire avec les données actuelles de l'utilisateur
+  const [editForm, setEditForm] = useState({
+    email: user?.email || '',
+    region: user?.region || '',
+    weight: user?.weight?.toString() || '',
+    biography: user?.biography || '',
+    num_moderate_activities: user?.num_moderate_activities?.toString() || '0',
+    num_intense_activities: user?.num_intense_activities?.toString() || '0',
+  });
+
   const userId = String(user?.id ?? '');
 
   const load = useCallback(async () => {
@@ -102,6 +117,32 @@ export default function ProfileScreen() {
       setIsLoading(false);
     }
   }, [userId]);
+
+  const handleUpdateProfile = async () => {
+  setLoading(true);
+  try {
+    const response = await profileApi.updateProfile({
+      email: editForm.email,
+      region: editForm.region, // On envoie 'region' pour correspondre au Backend
+      biography: editForm.biography,
+      weight: parseFloat(editForm.weight),
+      // On s'assure d'envoyer au moins 1 si le backend refuse 0, 
+      // ou idéalement on corrige le backend (voir ci-dessous)
+      num_moderate_activities: Math.max(0, parseInt(editForm.num_moderate_activities)),
+      num_intense_activities: Math.max(0, parseInt(editForm.num_intense_activities)),
+    });
+
+    Alert.alert("Succès", "Votre profil a été mis à jour !");
+    setIsModalVisible(false);
+    // Recharge les données pour voir les changements
+    void load(); 
+  } catch (error) {
+    console.error(error);
+    Alert.alert("Erreur", "Impossible de mettre à jour le profil.");
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => { void load(); }, [load]);
 
@@ -229,6 +270,9 @@ export default function ProfileScreen() {
               {i < arr.length - 1 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
             </React.Fragment>
           ))}
+          <TouchableOpacity onPress={() => setIsModalVisible(true)}>
+            <Text style={{color: '#007AFF', textAlign: 'center', marginTop: 10}}>Modifier le profil</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Logout */}
@@ -239,6 +283,73 @@ export default function ProfileScreen() {
           size="large"
           style={styles.logoutButton}
         />
+
+        <Modal visible={isModalVisible} animationType="slide" transparent={true}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Modifier mon profil</Text>
+              
+              <ScrollView>
+                <Text style={styles.label}>Email</Text>
+                <TextInput 
+                  style={styles.input} 
+                  value={editForm.email} 
+                  onChangeText={(t) => setEditForm({...editForm, email: t})} 
+                />
+
+                <Text style={styles.label}>Ville</Text>
+                <TextInput 
+                  style={styles.input} 
+                  value={editForm.region} 
+                  onChangeText={(t) => setEditForm({...editForm, region: t})} 
+                />
+
+                <Text style={styles.label}>Poids (kg)</Text>
+                <TextInput 
+                  style={styles.input} 
+                  keyboardType="numeric"
+                  value={editForm.weight} 
+                  onChangeText={(t) => setEditForm({...editForm, weight: t})} 
+                />
+
+                <Text style={styles.label}>Biographie</Text>
+                <TextInput 
+                  style={[styles.input, {height: 80}]} 
+                  multiline
+                  value={editForm.biography} 
+                  onChangeText={(t) => setEditForm({...editForm, biography: t})} 
+                />
+
+                <Text style={styles.label}>Activités modérées (h/semaine)</Text>
+                <TextInput 
+                  style={styles.input} 
+                  keyboardType="numeric"
+                  value={editForm.num_moderate_activities} 
+                  onChangeText={(t) => setEditForm({...editForm, num_moderate_activities: t})} 
+                />
+
+                <Text style={styles.label}>Activités intenses (h/semaine)</Text>
+                <TextInput 
+                  style={styles.input} 
+                  keyboardType="numeric"
+                  value={editForm.num_intense_activities} 
+                  onChangeText={(t) => setEditForm({...editForm, num_intense_activities: t})} 
+                />
+              </ScrollView>
+
+              <View style={styles.buttonRow}>
+                <TouchableOpacity style={styles.cancelButton} onPress={() => setIsModalVisible(false)}>
+                  <Text style={{color: 'red'}}>Annuler</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity style={styles.saveButton} onPress={handleUpdateProfile} disabled={loading}>
+                  <Text style={{color: 'white'}}>{loading ? "Enregistrement..." : "Enregistrer"}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -255,6 +366,56 @@ const styles = StyleSheet.create({
     width: 80, height: 80, borderRadius: 40,
     justifyContent: 'center', alignItems: 'center',
     alignSelf: 'center', marginBottom: 12, borderWidth: 3,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  label: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+    marginTop: 10,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 16,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 20,
+  },
+  saveButton: {
+    backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 10,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    padding: 15,
+    borderRadius: 10,
+    minWidth: 100,
+    alignItems: 'center',
   },
   avatarEmoji: { fontSize: 36 },
   profileName: { fontSize: 20, fontWeight: '700', textAlign: 'center', marginBottom: 4 },
